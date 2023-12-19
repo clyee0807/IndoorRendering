@@ -39,6 +39,7 @@ bool enableDebugMode = false;
 vec3 objectPos(3.0f, 1.0f, -1.5f), moveVec(0.0f), forwardVec(0.0f), rightVec(0.0f);
 GLfloat baseMoveStep = 0.01f, runFactor = 1.5;
 GLfloat moveStep = baseMoveStep;
+
 // Position & Rotation
 bool isMovingW = false, isMovingS = false, isMovingA = false, isMovingD = false, isMovingUp = false, isMovingDown = false;
 bool isMoving = false;
@@ -61,6 +62,8 @@ GLuint currentTexture;
 FBO sceneFBO;
 bool captureScreen = false;
 bool useNormalMap = true;
+bool useBlinnPhong = false;
+
 // Cel Shading
 FBO celFBO;
 bool cel = false;
@@ -249,6 +252,8 @@ void renderModel(const Model& model, Shader& shader, const mat4& mvMat, const ma
 
     GLint useNM = glGetUniformLocation(shader.ID, "useNormalMap");
     glUniform1i(useNM, useNormalMap ? 1 : 0);
+    GLint useBP = glGetUniformLocation(shader.ID, "useBlinnPhong");
+    glUniform1i(useBP, useBlinnPhong ? 1 : 0);
 
     GLint MMV = glGetUniformLocation(shader.ID, "MMV");
     glUniformMatrix4fv(MMV, 1, GL_FALSE, value_ptr(mvMat));
@@ -336,6 +341,7 @@ void renderGeneralMenu() {
 
     //
     ImGui::Checkbox("Enable Normal Map", &useNormalMap);
+    ImGui::Checkbox("Enable Blinn Phong", &useBlinnPhong);
 
     ImGui::End();
 }

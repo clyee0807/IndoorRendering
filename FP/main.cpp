@@ -583,9 +583,7 @@ int main(void) {
     Shader finalSP("FP/shaders/filter.vert", "FP/shaders/final.frag");
 
     // Models
-    //cout << glGetError() << endl;
     Model room("FP/models/Grey White Room.obj");
-    //cout << glGetError() << endl;
     Model trice("FP/models/Trice.obj");
 
 

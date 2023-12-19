@@ -23,7 +23,8 @@ uniform vec3 lightPos = vec3(-2.845, 2.028, -1.293);
 void main() {
     vec4 P = MMV * vec4(inPos, 1.0);
     vs_out.N = mat3(MMV) * inNormal;
-    vs_out.L = lightPos - P.xyz;
+    vec4 lightPosView = MV * vec4(lightPos, 1.0);
+    vs_out.L = lightPosView.xyz - P.xyz;
     vs_out.V = - P.xyz;
 
     texCoord = inTex;

@@ -44,15 +44,18 @@ void main() {
     vec3 H = normalize(L + V);
 
     // Blinn-Phong: Ambient, Diffuse, Specular
-    vec3 Ka, Kd, Ks;
+    vec3 Kd;
     if (hasTex) {
         Kd = textureColor.rgb;
     } else {
         Kd = material.Kd.rgb;
     }
-    vec3 ambient  = Ia * material.Ka.rgb;
-    vec3 diffuse  = Id * Kd * max(dot(N, L), 0.0);
-    vec3 specular = Is * material.Ks.rgb * pow(max(dot(N, H), 0.0), material.Ns);
+    //vec3 ambient  = Ia * material.Ka.rgb;
+    //vec3 diffuse  = Id * Kd * max(dot(N, L), 0.0);
+    //vec3 specular = Is * material.Ks.rgb * pow(max(dot(N, H), 0.0), material.Ns);
+    vec3 ambient  = material.Ka.rgb * Ia;
+    vec3 diffuse  = max(dot(N, L), 0.0) * Kd * Id;
+    vec3 specular = pow(max(dot(N, H), 0.0), material.Ns) * material.Ks.rgb * Is;
 
     // Output
     if (textureColor.a < 0.5) {

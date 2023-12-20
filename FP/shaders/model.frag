@@ -8,6 +8,9 @@ in VS_OUT {
     vec3 V;
 } fs_in;
 in vec2 texCoord;
+in vec3 normal;
+in vec3 lightDir;
+in vec3 eyeDir;
 
 uniform int useNormalMap;
 uniform int useBlinnPhong;
@@ -39,6 +42,39 @@ vec4 diffuse_mapping() {
         return vec4(material.Kd.rgb, 1.0);
     }
 }
+
+//vec4 normal_mapping() {
+//    vec3 V = normalize(eyeDir);
+//    vec3 L = normalize(lightDir);
+//    vec3 N = normalize(texture(normalMap, texCoord).rgb * 2.0 - vec3(1.0)); 
+//    vec3 R = reflect(-L, N);
+//
+//    vec3 diffuse_albedo = texture(tex, texCoord).rgb;
+//    vec3 diffuse = max(dot(N, L), 0.0) * diffuse_albedo;
+//    vec3 specular_albedo = vec3(1.0);
+//    vec3 specular = max(pow(dot(R, V), 20.0), 0.0) * specular_albedo;
+//    
+//    return vec4(diffuse + specular, 1.0);
+//}
+vec4 normal_mapping() {
+    vec3 tangentNormal = texture(normalMap, texCoord).rgb * 2.0 - 1.0;
+    vec3 N = normalize(normal);
+    vec3 L = normalize(lightDir);
+    vec3 V = normalize(eyeDir);
+    vec3 H = normalize(L + V);
+
+    vec3 ambient = material.Ka.rgb * Ia;
+    vec3 diffuse = max(dot(N, L), 0.0) * Id;
+    vec3 specular = pow(max(dot(H, N), 0.0), material.Ns) * Is;
+
+    if(hasTex) {
+        diffuse *= texture(tex, texCoord).rgb;
+    }
+
+    return vec4(ambient + diffuse + specular, 1.0);
+}
+
+
 
 void main() {
     vec4 textureColor = texture(tex, texCoord);
@@ -72,6 +108,9 @@ void main() {
     if(useBlinnPhong == 1) {
         texel = vec4(ambient + diffuse + specular, 1.0);
     }
+    else if(useNormalMap == 1) {
+        texel = normal_mapping();
+    }    
     else {
         texel = diffuse_mapping();
     }

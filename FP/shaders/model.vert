@@ -14,8 +14,7 @@ out VS_OUT {
 
 out vec3 normal;
 out vec2 texCoord;
-out vec3 lightDir;
-out vec3 eyeDir;
+out mat3 f_TBN;
 
 uniform mat4 MMV;
 uniform mat4 MV;
@@ -34,11 +33,9 @@ void main() {
     // Eye space to tangent space TBN
     vec3 T = normalize(mat3(MMV) * inTan);
     vec3 B = normalize(mat3(MMV) * inBitan);
+    //vec3 N = normalize(mat3(MMV) * inNormal);
     vec3 N = normalize(inNormal);
-    mat3 TBN = mat3(T, B, N);
-
-
-
+    f_TBN = mat3(T, B, N);
 
 
     texCoord = inTex;

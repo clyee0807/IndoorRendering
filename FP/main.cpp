@@ -61,7 +61,7 @@ GLuint rectVAO, rectVBO;
 GLuint currentTexture;
 FBO sceneFBO;
 bool captureScreen = false;
-bool useNormalMap = true;
+bool useNormalMap = false;
 bool useBlinnPhong = false;
 
 // Cel Shading
@@ -592,6 +592,13 @@ int main(void) {
     Model room("FP/models/Grey White Room.obj");
     Model trice("FP/models/Trice.obj");
 
+    cout << "trice:\n";
+    cout << "    meshList.size = " << trice.meshList.size() << "\n";
+    cout << "    textureList.size = " << trice.textureList.size() << "\n";
+    cout << "    textureList[0] = " << trice.textureList[0].ID << "\n";
+    cout << "    meshList[0].normHandle = " << trice.meshList[0].normHandle << "\n";
+    cout << "    meshList[0].VBO4 = " << trice.meshList[0].VBO4 << "\n";
+    cout << "    meshList[0].VBO5 = " << trice.meshList[0].VBO5 << "\n";
 
 
     // Render loop

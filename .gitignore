@@ -1,0 +1,7 @@
+.vs/
+x64/
+FP/x64/
+FP/FP.vcxproj
+
+*.docx
+*.pdf

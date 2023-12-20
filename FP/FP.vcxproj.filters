@@ -1,0 +1,82 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="來源檔案">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="標頭檔">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+    <Filter Include="資源檔">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="來源檔案\glad">
+      <UniqueIdentifier>{b74e8409-180a-4721-907f-5ef8247e4dd4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="來源檔案\imgui">
+      <UniqueIdentifier>{fe79ddab-2813-4df2-aa7b-5e22b837e001}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="來源檔案\stb">
+      <UniqueIdentifier>{21700a09-57a5-499b-9827-2354d6838914}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="來源檔案\shader">
+      <UniqueIdentifier>{0d42b920-2445-42d7-bfc9-f220f972208c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="來源檔案\texture">
+      <UniqueIdentifier>{50166fef-353e-417f-bd28-cd08d733cd3a}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\include\glad\glad.c">
+      <Filter>來源檔案\glad</Filter>
+    </ClCompile>
+    <ClCompile Include="..\include\imgui\imgui.cpp">
+      <Filter>來源檔案\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\include\imgui\imgui_draw.cpp">
+      <Filter>來源檔案\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\include\imgui\imgui_impl_glfw.cpp">
+      <Filter>來源檔案\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\include\imgui\imgui_impl_opengl3.cpp">
+      <Filter>來源檔案\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\include\imgui\imgui_tables.cpp">
+      <Filter>來源檔案\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\include\imgui\imgui_widgets.cpp">
+      <Filter>來源檔案\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="main.cpp">
+      <Filter>資源檔</Filter>
+    </ClCompile>
+    <ClCompile Include="..\include\stb\stb_vorbis.c">
+      <Filter>來源檔案\stb</Filter>
+    </ClCompile>
+    <ClCompile Include="src\texture\texture.cpp">
+      <Filter>來源檔案\texture</Filter>
+    </ClCompile>
+    <ClCompile Include="src\texture\texture_array.cpp">
+      <Filter>來源檔案\texture</Filter>
+    </ClCompile>
+    <ClCompile Include="src\shader\shader.cpp">
+      <Filter>來源檔案\shader</Filter>
+    </ClCompile>
+    <ClCompile Include="..\include\imgui\imgui_demo.cpp">
+      <Filter>來源檔案\imgui</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="shaders\cel.frag" />
+    <None Include="shaders\filter.vert" />
+    <None Include="shaders\model.frag" />
+    <None Include="shaders\model.vert" />
+    <None Include="shaders\final.frag" />
+    <None Include="shaders\dsm.frag" />
+    <None Include="shaders\dsm.vert" />
+  </ItemGroup>
+</Project>

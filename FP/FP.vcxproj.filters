@@ -73,6 +73,11 @@
     <None Include="shaders\model.frag" />
     <None Include="shaders\model.vert" />
     <None Include="shaders\final.frag" />
+    <None Include="shaders\ssr.frag" />
+    <None Include="shaders\ssr.vert" />
+    <None Include="shaders\deferred.frag" />
+    <None Include="shaders\deferred.vert" />
+    <None Include="shaders\output.frag" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\model.h">

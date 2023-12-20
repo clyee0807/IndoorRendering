@@ -576,12 +576,129 @@ int main(void) {
         cerr << "INIT_ERROR: " << e.what() << endl;
         return EXIT_FAILURE;
     }
+    
+    fullScreenQuadInit();
+    
+    GLint originalFrameBuffer;
+    glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &originalFrameBuffer);
+    
+#pragma region GBuffer Initialization
+    GLuint gBuffer;
+    glGenFramebuffers(1, &gBuffer);
+    //glBindFramebuffer(GL_FRAMEBUFFER, gBuffer);
+    GLuint gPosition, gNormal, gAlbedo, gSpecular;
+    /*
+    glGenTextures(1, &gNormal);
+    glBindTexture(GL_TEXTURE_2D, gNormal);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, windowWidth, windowHeight, 0, GL_RGBA, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, gNormal, 0);
+    glGenTextures(1, &gAlbedo);
+    glBindTexture(GL_TEXTURE_2D, gAlbedo);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, windowWidth, windowHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, gAlbedo, 0);
+    glGenTextures(1, &gSpecular);
+    glBindTexture(GL_TEXTURE_2D, gSpecular);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, windowWidth, windowHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, gSpecular, 0);
+    
+    //depth texture
+    GLuint depthMap;
+    glGenTextures(1, &depthMap);
+    glBindTexture(GL_TEXTURE_2D, depthMap);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH32F_STENCIL8, windowWidth, windowHeight, 0, GL_DEPTH_STENCIL, GL_FLOAT_32_UNSIGNED_INT_24_8_REV, 0);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, depthMap, 0);
+    
+    GLenum drawBuffers1[3] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
+    glDrawBuffers(3, drawBuffers1);
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+        std::cout << std::hex << glCheckFramebufferStatus(GL_FRAMEBUFFER) << std::endl;
+        return -1;
+    }
+#pragma endregion
+*/
+/*
+#pragma region lighting pass Buffer Initialization
+    GLuint LPFB; //Lighting Pass Buffer
+    glGenFramebuffers(1, &LPFB);
+    glBindFramebuffer(GL_FRAMEBUFFER, LPFB);
+    GLuint colorBuffer;
+    glGenTextures(1, &colorBuffer);
+    glBindTexture(GL_TEXTURE_2D, colorBuffer);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, windowWidth, windowHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, colorBuffer, 0);
+    GLenum drawBuffers2[1] = { GL_COLOR_ATTACHMENT0 };
+    glDrawBuffers(1, drawBuffers2);
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+        std::cout << "problems binding LPFB" << std::endl;
+        return -1;
+    }
+#pragma endregion
 
+#pragma region SSR pass Buffer Initialization
+    GLuint ssrFB; //SSR Frame Buffer
+    glGenFramebuffers(1, &ssrFB);
+    glBindFramebuffer(GL_FRAMEBUFFER, ssrFB);
+    glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, depthMap, 0);
+    GLuint reflectionColorBuffer;
+    glGenTextures(1, &reflectionColorBuffer);
+    glBindTexture(GL_TEXTURE_2D, reflectionColorBuffer);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, windowWidth, windowHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, reflectionColorBuffer, 0);
+    GLenum drawBuffers3[1] = { GL_COLOR_ATTACHMENT0 };
+    glDrawBuffers(1, drawBuffers3);
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+        std::cout << "problems binding ssrFB" << std::endl;
+        return -1;
+    }
+#pragma endregion
+*/
+    
     // Shaders
     Shader modelSP("FP/shaders/model.vert", "FP/shaders/model.frag");
     Shader celSP("FP/shaders/filter.vert", "FP/shaders/cel.frag");
     Shader finalSP("FP/shaders/filter.vert", "FP/shaders/final.frag");
-
+    
+    Shader lightingPassShader("FP/shaders/deferred.vert", "FP/shaders/deferred.frag");
+    lightingPassShader.activate();
+    lightingPassShader.setInt("gNormal", 0);
+    lightingPassShader.setInt("gAlbedo", 1);
+    lightingPassShader.setInt("gSpecular", 2);
+    lightingPassShader.setInt("depthMap", 3);
+    glm::vec3 lights[] = {
+        glm::vec3(20, 10, 10), glm::vec3(1,1,1), glm::vec3(1,0.007f,0.0002f),          //position, color, (constant, linear, quadratic)
+        glm::vec3(-25, -5, -35), glm::vec3(1,1,1), glm::vec3(1,0.007f,0.0002f),
+        glm::vec3(25, -5, -35), glm::vec3(1,1,1), glm::vec3(1,0.027,0.0028),
+    };
+    for (int i = 0; i < sizeof(lights) / sizeof(lights[0]); i++)
+    {
+        lightingPassShader.setVec3("lights[" + std::to_string(i) + "].intensity", lights[i * 3 + 1]);
+        lightingPassShader.setFloat("lights[" + std::to_string(i) + "].constant", lights[i * 3 + 2].x);
+        lightingPassShader.setFloat("lights[" + std::to_string(i) + "].linear", lights[i * 3 + 2].y);
+        lightingPassShader.setFloat("lights[" + std::to_string(i) + "].quadratic", lights[i * 3 + 2].z);
+    }
+    
+    Shader SSRShader("FP/shaders/ssr.vert", "FP/shaders/ssr.frag");
+    SSRShader.activate();
+    SSRShader.setInt("gNormal", 0);
+    SSRShader.setInt("colorBuffer", 1);
+    SSRShader.setInt("depthMap", 2);
+    Shader outputShader("FP/shaders/ssr.vert", "FP/shaders/output.frag");
+    outputShader.activate();
+    outputShader.setInt("colorTexture", 0);
+    outputShader.setInt("refTexture", 1);
+    
     // Models
     //cout << glGetError() << endl;
     Model room("FP/models/Grey White Room.obj");
@@ -592,7 +709,13 @@ int main(void) {
 
     // Render loop
     while (!glfwWindowShouldClose(window)) {
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        //Forward Pass
+        //glBindFramebuffer(GL_DRAW_FRAMEBUFFER, gBuffer);
+        glClearColor(1.0, 1.0, 1.0, 1.0f);
+        //glStencilMask(0xFF);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+        glStencilFunc(GL_EQUAL, 0, 0xFF);
+        glStencilMask(0x00);
 
         // ImGui
         if (showMenu) startImGuiFrame();
@@ -614,11 +737,11 @@ int main(void) {
         mat4 MtriceT = translate(mat4(1.0f), tricePos);
         mat4 Mtrice = MtriceT * MtriceS;
         renderModel(trice, modelSP, Mv * Mtrice, Mv, Mp);
-
+        glStencilFunc(GL_ALWAYS, 1, 0xFF);
+        glStencilMask(0xFF);
         /*
         sceneFBO.unbind();
         currentTexture = sceneFBO.getTexture();
-
         // Split by separator
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         finalSP.activate();
@@ -627,8 +750,81 @@ int main(void) {
         glBindTexture(GL_TEXTURE_2D, currentTexture);
         renderFullScreenQuad();
         */
+        /*
+        //Deferred(Lighting) Pass
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, originalFrameBuffer);
+        glClearColor(1.0, 1.0, 1.0, 1.0f);
+        //glClear(GL_COLOR_BUFFER_BIT);
+        glStencilMask(0xFF);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, gNormal);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, gAlbedo);
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_2D, gSpecular);
+        glActiveTexture(GL_TEXTURE3);
+        glBindTexture(GL_TEXTURE_2D, depthMap);
+
+        lightingPassShader.activate();
+        lightingPassShader.setVec3("lightPosition", Mv * vec4(lights[0], 1));
+        lightingPassShader.setFloat("SCR_WIDTH", windowWidth);
+        lightingPassShader.setFloat("SCR_HEIGHT", windowHeight);
+        lightingPassShader.setMat4("invProj", inverse(Mp));
+        for (int i = 0; i < sizeof(lights) / sizeof(lights[0]); i++)
+        {
+            lightingPassShader.setVec3("lights[" + std::to_string(i) + "].position", Mv * vec4(lights[i * 3], 1));
+        }
 
 
+        glBindVertexArray(rectVAO);
+        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+        */
+        /*
+        //SSR
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, ssrFB);
+        glClearColor(1.0, 1.0, 1.0, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT);
+        glDepthMask(GL_FALSE);
+
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, gNormal);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, colorBuffer);
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_2D, depthMap);
+
+        SSRShader.activate();
+        SSRShader.setFloat("SCR_WIDTH", windowWidth);
+        SSRShader.setFloat("SCR_HEIGHT", windowHeight);
+        SSRShader.setMat4("invProjection", inverse(Mp));
+        SSRShader.setMat4("projection", Mp);
+
+        glStencilFunc(GL_EQUAL, 1, 0xFF);
+        glStencilMask(0x00);
+        glBindVertexArray(rectVAO);
+        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+        glDepthMask(GL_TRUE);
+
+        //output
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, originalFrameBuffer);
+        glClearColor(0, 0, 0, 1.0f);
+        glStencilMask(0xFF);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, colorBuffer);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, reflectionColorBuffer);
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_2D, gSpecular);
+
+        outputShader.activate();
+        glStencilFunc(GL_ALWAYS, 1, 0xFF);
+        glBindVertexArray(rectVAO);
+        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+        */
         // Screen capturing
         if (captureScreen) {
             GLubyte* pixels = new GLubyte[windowWidth * windowHeight * 4];

@@ -1,3 +1,11 @@
-﻿C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\MSBuild\Microsoft\VC\v160\Microsoft.CppBuild.targets(513,5): warning MSB8028: 中繼目錄 (x64\Debug\) 包含從其他專案 (AS2.vcxproj, AS3.vcxproj) 共用的檔案。這可能導致錯誤的清除和重建行為。
-  texture.cpp
-  FP.vcxproj -> D:\CLY\NTHU\11210\GPA\Homework\FP\x64\Debug\FP.exe
+﻿C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\Msbuild\Microsoft\VC\v160\Microsoft.CppBuild.targets(513,5): warning MSB8028: The intermediate directory (x64\Debug\) contains files shared from another project (AS2.vcxproj, AS3.vcxproj).  This can lead to incorrect clean and rebuild behavior.
+  main.cpp
+C:\GPA_final\IndoorRendering\FP\main.cpp(1,1): warning C4819: The file contains a character that cannot be represented in the current code page (950). Save the file in Unicode format to prevent data loss
+C:\GPA_final\IndoorRendering\FP\src\camera.h(61,24): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
+C:\GPA_final\IndoorRendering\FP\main.cpp(180,22): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
+C:\GPA_final\IndoorRendering\FP\main.cpp(181,22): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
+C:\GPA_final\IndoorRendering\FP\main.cpp(589,12): warning C4101: 'gPosition': unreferenced local variable
+C:\GPA_final\IndoorRendering\FP\main.cpp(589,23): warning C4101: 'gNormal': unreferenced local variable
+C:\GPA_final\IndoorRendering\FP\main.cpp(589,41): warning C4101: 'gSpecular': unreferenced local variable
+C:\GPA_final\IndoorRendering\FP\main.cpp(589,32): warning C4101: 'gAlbedo': unreferenced local variable
+  FP.vcxproj -> C:\GPA_final\IndoorRendering\x64\Debug\FP.exe

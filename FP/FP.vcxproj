@@ -71,8 +71,8 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>D:\CLY\NTHU\11210\GPA\Homework\FP\include;$(IncludePath)</IncludePath>
-    <LibraryPath>D:\CLY\NTHU\11210\GPA\Homework\FP\lib;$(LibraryPath)</LibraryPath>
+    <IncludePath>$(SolutionDir)\include;$(IncludePath)</IncludePath>
+    <LibraryPath>$(SolutionDir)\lib;$(LibraryPath)</LibraryPath>
     <ExecutablePath>$(ExecutablePath)</ExecutablePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -173,10 +173,15 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="shaders\cel.frag" />
+    <None Include="shaders\deferred.frag" />
+    <None Include="shaders\deferred.vert" />
     <None Include="shaders\filter.vert" />
     <None Include="shaders\final.frag" />
     <None Include="shaders\model.frag" />
     <None Include="shaders\model.vert" />
+    <None Include="shaders\output.frag" />
+    <None Include="shaders\ssr.frag" />
+    <None Include="shaders\ssr.vert" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\fbo.h" />

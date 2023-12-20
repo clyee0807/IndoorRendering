@@ -1,12 +1,17 @@
 #version 450 core
 
 layout(location = 0) out vec4 fragColor;
+//layout (location = 0) out vec4 gNormal;
+//layout (location = 1) out vec3 gAlbedo;
+//layout (location = 2) out vec4 gSpecular;
 
 in VS_OUT {
     vec3 N;
     vec3 L;
     vec3 V;
 } fs_in;
+
+in vec3 posForColoring;
 in vec2 texCoord;
 
 uniform int useNormalMap;
@@ -60,4 +65,11 @@ void main() {
     } else {
         fragColor = vec4(ambient + diffuse + specular, 1.0);
     }
+    /*
+    gNormal.xyz = N;
+    gNormal.w = posForColoring.z;
+    gAlbedo = Kd;
+    gSpecular.rgb = specular;
+    gSpecular.a = 20.0f;
+    */
 }

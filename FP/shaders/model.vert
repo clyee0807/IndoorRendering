@@ -12,6 +12,7 @@ out VS_OUT {
     vec3 V;
 } vs_out;
 
+out vec3 posForColoring;
 out vec2 texCoord;
 
 uniform mat4 MMV;
@@ -26,6 +27,7 @@ void main() {
     vs_out.L = lightPos - P.xyz;
     vs_out.V = - P.xyz;
 
+    posForColoring = (MMV * vec4(inPos,1)).xyz;
     texCoord = inTex;
     gl_Position = MP * P;
 }

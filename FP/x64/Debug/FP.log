@@ -1,3 +1,20 @@
-﻿C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\MSBuild\Microsoft\VC\v160\Microsoft.CppBuild.targets(513,5): warning MSB8028: 中繼目錄 (x64\Debug\) 包含從其他專案 (AS2.vcxproj, AS3.vcxproj) 共用的檔案。這可能導致錯誤的清除和重建行為。
+﻿  glad.c
+  imgui.cpp
+  imgui_draw.cpp
+  imgui_impl_glfw.cpp
+  imgui_impl_opengl3.cpp
+  imgui_tables.cpp
+  imgui_widgets.cpp
+  main.cpp
+C:\GPA_final\IndoorRendering\FP\main.cpp(1,1): warning C4819: The file contains a character that cannot be represented in the current code page (950). Save the file in Unicode format to prevent data loss
+C:\GPA_final\IndoorRendering\FP\src\camera.h(61,24): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
+C:\GPA_final\IndoorRendering\FP\main.cpp(183,22): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
+C:\GPA_final\IndoorRendering\FP\main.cpp(184,22): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
+  shader.cpp
   texture.cpp
-  FP.vcxproj -> D:\CLY\NTHU\11210\GPA\Homework\FP\x64\Debug\FP.exe
+  texture_array.cpp
+C:\GPA_final\IndoorRendering\FP\src\texture\texture_array.cpp(32,15): warning C4244: 'initializing': conversion from 'double' to 'GLuint', possible loss of data
+C:\GPA_final\IndoorRendering\FP\src\texture\texture_array.cpp(33,111): warning C4267: 'argument': conversion from 'size_t' to 'GLsizei', possible loss of data
+C:\GPA_final\IndoorRendering\FP\src\texture\texture_array.cpp(34,79): warning C4267: 'argument': conversion from 'size_t' to 'GLsizei', possible loss of data
+  Generating Code...
+  FP.vcxproj -> C:\GPA_final\IndoorRendering\x64\Debug\FP.exe

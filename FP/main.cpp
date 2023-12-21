@@ -765,7 +765,7 @@ int main(void) {
         currentTexture = sceneFBO.getTexture();
 
         // Render final result to screen
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        // glBindFramebuffer(GL_FRAMEBUFFER, 0);
         finalSP.activate();
         finalSP.setInt("tex", 0);
         renderFullScreenQuad(currentTexture);

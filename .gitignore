@@ -1,7 +1,8 @@
 .vs/
 x64/
 FP/x64/
-FP/FP.vcxproj
+
+imgui.ini
 
 *.docx
 *.pdf

@@ -13,8 +13,6 @@
 #include "shader/shader.h"
 #include "texture/texture.h"
 
-using namespace std;
-
 struct Vertex {
     glm::vec3 position;
     glm::vec3 normal;
@@ -31,14 +29,14 @@ struct Material {
 };
 
 struct Mesh {
-    GLuint VAO, VBO1, VBO2, VBO3, VBO4, VBO5, EBO;
+    GLuint VAO = 0, VBO1 = 0, VBO2 = 0, VBO3 = 0, VBO4 = 0, VBO5 = 0, EBO = 0;
 
-    vector<glm::vec3> vertPositions;
-    vector<glm::vec3> vertNormals;
-    vector<glm::vec2> texCoords;
-    vector<glm::vec3> tangent;
-    vector<glm::vec3> bitangent;
-    vector<unsigned int> vertIndices;
+    std::vector<glm::vec3> vertPositions;
+    std::vector<glm::vec3> vertNormals;
+    std::vector<glm::vec2> texCoords;
+    std::vector<glm::vec3> tangent;
+    std::vector<glm::vec3> bitangent;
+    std::vector<unsigned int> vertIndices;
     unsigned int texHandle;
     unsigned int normHandle;
     Material mats;
@@ -46,7 +44,7 @@ struct Mesh {
 
 class Model {
     private:
-        string modelDir, modelName;
+        std::string modelDir, modelName;
         Assimp::Importer importer;
         const aiScene* scene = nullptr;
         aiNode* node = nullptr;
@@ -55,40 +53,44 @@ class Model {
         unsigned int numMeshes;
         unsigned int numVertices;
         unsigned int numIndices;
-        vector<Mesh> meshList;
-        vector<Texture> textureList;
+        std::vector<Mesh> meshList;
+        std::vector<Texture> textureList;
 
         Model(const char *modelPath) {
             // Path
-            modelDir = string(modelPath);
+            modelDir = std::string(modelPath);
             size_t lastSlash = modelDir.find_last_of("/\\");
-            if (lastSlash != string::npos) {
+            if (lastSlash != std::string::npos) {
                 modelName = modelDir.substr(lastSlash + 1);
                 modelDir = modelDir.substr(0, lastSlash);
             } else {
                 modelDir = ".";
             }
-            cout << "MODEL_DIR: " << modelDir << ", NAME: " << modelName << endl;
+            std::cout << "MODEL_DIR: " << modelDir << ", NAME: " << modelName << std::endl;
 
             // Texture class flips UV, so no need for aiProcess_FlipUVs
-            scene = importer.ReadFile(modelPath, aiProcess_JoinIdenticalVertices | aiProcess_Triangulate | aiProcess_GenNormals | aiProcess_CalcTangentSpace);
+            scene = importer.ReadFile(modelPath, aiProcess_JoinIdenticalVertices | 
+                                                 aiProcess_Triangulate | 
+                                                 aiProcess_GenNormals | 
+                                                 aiProcess_CalcTangentSpace);
             loadModel();
         }
 
         void render(Shader& shader) const {
             for (unsigned int i = 0; i < numMeshes; i++) {
+                // Shading
                 bool hasTexture = meshList[i].texHandle > 0;
                 bool hasNormalMap = meshList[i].normHandle > 0;
                 shader.setInt("hasTex", hasTexture);
-                shader.setInt("hasNormalMap", hasNormalMap);
+                shader.setInt("hasNM", hasNormalMap);
+                shader.setTexture("tex", meshList[i].texHandle, 0);
+                shader.setTexture("normalMap", meshList[i].normHandle, 1);
 
+                // Lighting - Blinn-Phong
                 shader.setVec4("material.Ka", meshList[i].mats.Ka);
                 shader.setVec4("material.Kd", meshList[i].mats.Kd);
                 shader.setVec4("material.Ks", meshList[i].mats.Ks);
                 shader.setFloat("material.Ns", meshList[i].mats.Ns);
-
-                shader.setTexture("tex", meshList[i].texHandle, 0);
-                shader.setTexture("normalMap", meshList[i].normHandle, 1);
 
                 glBindVertexArray(meshList[i].VAO);
                 glDrawElements(GL_TRIANGLES, (GLsizei)meshList[i].vertIndices.size(), GL_UNSIGNED_INT, 0);
@@ -99,7 +101,7 @@ class Model {
     private:
         void loadModel() {
             if (!scene || !scene->mRootNode || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE) {
-                cerr << "ERROR::ASSIMP:: " << importer.GetErrorString() << endl;
+                std::cerr << "ERROR::ASSIMP:: " << importer.GetErrorString() << std::endl;
                 return;
             }
 
@@ -149,23 +151,27 @@ class Model {
                     } else
                         meshList[i].texCoords.push_back(glm::vec2(0.0f));
 
-                    
-                    // Tangents
-                    /*
-                    glm::vec3 tangent{};
-                    tangent.x = mesh->mTangents[i2].x;
-                    tangent.y = mesh->mTangents[i2].y;
-                    tangent.z = mesh->mTangents[i2].z;
-                    meshList[i].tangent.push_back(tangent);
 
-                    // Bitangents
-                    glm::vec3 bitangent{};
-                    bitangent.x = mesh->mBitangents[i2].x;
-                    bitangent.y = mesh->mBitangents[i2].y;
-                    bitangent.z = mesh->mBitangents[i2].z;
-                    meshList[i].bitangent.push_back(bitangent);
-                    */
-                    
+                    // Tangents & Bitangents
+                    if (mesh->HasTangentsAndBitangents()) {
+                        glm::vec3 tangent{};
+                        tangent.x = mesh->mTangents[i2].x;
+                        tangent.y = mesh->mTangents[i2].y;
+                        tangent.z = mesh->mTangents[i2].z;
+                        meshList[i].tangent.push_back(tangent);
+
+                        glm::vec3 bitangent{};
+                        bitangent.x = mesh->mBitangents[i2].x;
+                        bitangent.y = mesh->mBitangents[i2].y;
+                        bitangent.z = mesh->mBitangents[i2].z;
+                        meshList[i].bitangent.push_back(bitangent);
+
+                        // std::cout << "TAN:   " << tangent.x << ", " << tangent.y << ", " << tangent.y << std::endl;
+                        // std::cout << "BITAN: " << bitangent.x << ", " << bitangent.y << ", " << bitangent.y << std::endl;
+                    } else {
+                        meshList[i].tangent.push_back(glm::vec3(0.0f));
+                        meshList[i].bitangent.push_back(glm::vec3(0.0f));
+                    }
 
                     numVertices++;
                 }
@@ -200,6 +206,8 @@ class Model {
             glGenBuffers(1, &meshList[index].VBO1); // Alternative to using 3 separate VBOs, instead use only 1 VBO and set glVertexAttribPointer's offset...
             glGenBuffers(1, &meshList[index].VBO2); // like was done in tutorial 3... Orbiting spinning cubes.
             glGenBuffers(1, &meshList[index].VBO3);
+            glGenBuffers(1, &meshList[index].VBO4);
+            glGenBuffers(1, &meshList[index].VBO5);
             glGenBuffers(1, &meshList[index].EBO);
 
             glBindVertexArray(meshList[index].VAO);
@@ -225,7 +233,6 @@ class Model {
             glEnableVertexAttribArray(2);
             glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void *)0);
 
-            /*
             // Tangents
             glBindBuffer(GL_ARRAY_BUFFER, meshList[index].VBO4);
             glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec3) * meshList[index].tangent.size(), meshList[index].tangent.data(), GL_STATIC_DRAW);
@@ -239,11 +246,10 @@ class Model {
 
             glEnableVertexAttribArray(4);
             glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-            */
 
             // Indices for: glDrawElements()
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, meshList[index].EBO);
-            glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(unsigned int) * meshList[index].vertIndices.size(), &meshList[index].vertIndices[0], GL_STATIC_DRAW);
+            glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(unsigned int) * meshList[index].vertIndices.size(), meshList[index].vertIndices.data(), GL_STATIC_DRAW);
 
             // Unbind VAO, VBO, EBO
             glBindVertexArray(0);
@@ -251,7 +257,7 @@ class Model {
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
         }
 
-        int isImageLoaded(string file_name) {
+        int isImageLoaded(std::string file_name) {
             for (unsigned int i = 0; i < textureList.size(); i++)
                 if (file_name.compare(textureList[i].imageName) == 0)
                     return textureList[i].ID;
@@ -259,16 +265,16 @@ class Model {
         }
 
         void loadMaterialTextures(aiMaterial* mat, aiTextureType type, unsigned int& textureHandle) {
-            vector<Texture> textures;
+            std::vector<Texture> textures;
             for (unsigned int i = 0; i < mat->GetTextureCount(type); i++) {
                 aiString str;
                 mat->GetTexture(type, i, &str);
 
-                string imageName = str.C_Str();
+                std::string imageName = str.C_Str();
                 int loaded = isImageLoaded(imageName);
 
                 if (loaded == -1) {
-                    string pathStr = modelDir + "/" + imageName;
+                    std::string pathStr = modelDir + "/" + imageName;
                     const char* path = pathStr.c_str();
                     Texture tex(path);
 

@@ -37,15 +37,16 @@ int windowWidth = BASE_WINDOW_WIDTH, windowHeight = BASE_WINDOW_HEIGHT;
 mat4 Mvp(1.0f), Mv(1.0f), Mp(1.0f);
 bool isFullscreen = false, showMenu = true, tabPressed = false;
 bool enableDebugMode = false;
+bool captureScreen = false;
 
 // Object
+// Focus
 vec3 objectPos(3.0f, 1.0f, -1.5f), moveVec(0.0f), forwardVec(0.0f), rightVec(0.0f);
 GLfloat baseMoveStep = 0.01f, runFactor = 1.5;
 GLfloat moveStep = baseMoveStep;
-// Position & Rotation
 bool isMovingW = false, isMovingS = false, isMovingA = false, isMovingD = false, isMovingUp = false, isMovingDown = false;
 bool isMoving = false;
-
+// Trice
 vec3 tricePos(2.05, 0.628725, -1.9);
 float triceScale = 0.001f;
 // Please ensure applying the matrices in STR order (R * T * S), or else you'd think
@@ -76,13 +77,15 @@ float shadowBias = 0.025f, biasVariation = 0.03f;
 // Shaders
 GLuint rectVAO, rectVBO, currentTexture;
 FBO sceneFBO(windowWidth, windowHeight, FBOType::FBOType_Normal);
-bool captureScreen = false;
 bool useNormalMap = true;
+// Blinn-Phong
+bool enableBP = true;
 // Directional Shadow Mapping
 FBO dsmFBO(1024, 1024, FBOType::FBOType_Depth);
+bool enableDSM = true;
 // Cel Shading
 FBO celFBO(windowWidth, windowHeight, FBOType::FBOType_Normal);
-bool cel = false;
+bool enableCel = false;
 
 
 
@@ -273,9 +276,7 @@ static void updateObjectPosition() {
 }
 
 static void renderModel(const Model& model, Shader& shader, GLuint shadowMap, const mat4& mMat, const mat4& vMat, const mat4& pMat) {
-    shader.setInt("useNormalMap", useNormalMap);
-
-    // Matrices
+    // MVP
     shader.setMat4("MM", mMat);
     shader.setMat4("MV", vMat);
     shader.setMat4("MP", pMat);
@@ -283,10 +284,15 @@ static void renderModel(const Model& model, Shader& shader, GLuint shadowMap, co
     // Lighting
     shader.setMat4("MDSM", MDSM);
     shader.setVec3("lightPos", lightPos);
+    // Directional Shadow Mapping
     shader.setInt("sampleRadius", sampleRadius);
     shader.setFloat("shadowBias", shadowBias);
     shader.setFloat("biasVariation", biasVariation);
-    
+
+    // Options
+    shader.setInt("useNM", useNormalMap);
+    shader.setInt("enableBP", enableBP);
+    shader.setInt("enableDSM", enableDSM);
     
     model.render(shader);
 }
@@ -461,10 +467,16 @@ static void renderLightingMenu() {
     ImGui::DragFloat3("Light Pos.", (float*)&lightPos, 0.01f, -3.0f, 3.0f, "%.2f");
 
     // Lighting - Directional Shadow Mapping
-    if (ImGui::CollapsingHeader("Directional Shadow Mapping")) {
-        ImGui::SliderInt("Sample Radius", &sampleRadius, 2, 8, "%d");
-        ImGui::SliderFloat("Shadow Bias", &shadowBias, 0.005f, 0.05f, "%.3f");
-        ImGui::SliderFloat("Bias Variation", &biasVariation, 0.01f, 0.05f, "%.3f");
+    ImGui::Checkbox("Enable Blinn-Phong", &enableBP);
+
+    // Lighting - Directional Shadow Mapping
+    ImGui::Checkbox("Enable DSM", &enableDSM);
+    if (enableDSM) {
+        if (ImGui::CollapsingHeader("Directional Shadow Mapping")) {
+            ImGui::SliderInt("Sample Radius", &sampleRadius, 2, 8, "%d");
+            ImGui::SliderFloat("Shadow Bias", &shadowBias, 0.005f, 0.05f, "%.3f");
+            ImGui::SliderFloat("Bias Variation", &biasVariation, 0.01f, 0.05f, "%.3f");
+        }
     }
 
     ImGui::SeparatorText("Shading");
@@ -529,7 +541,7 @@ static void APIENTRY GLDebugMessageCallback(GLenum source, GLenum type, GLuint i
             break;
 
         case GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR:
-            _type = "UDEFINED BEHAVIOR";
+            _type = "UNDEFINED BEHAVIOR";
             break;
 
         case GL_DEBUG_TYPE_PORTABILITY:

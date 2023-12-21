@@ -71,7 +71,7 @@ class FBO {
 
             auto fboStatus = glCheckFramebufferStatus(GL_FRAMEBUFFER);
             if (fboStatus != GL_FRAMEBUFFER_COMPLETE) {
-                cerr << "FB_ERROR: " << fboStatus << endl;
+                std::cerr << "FB_ERROR: " << fboStatus << std::endl;
             }
 
             // Unbind the framebuffer

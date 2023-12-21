@@ -1,0 +1,12 @@
+D:\COURSE\OPENGL\FP\include\glad\glad.c;D:\COURSE\OPENGL\FP\FP\x64\Release\glad.obj
+D:\COURSE\OPENGL\FP\include\imgui\imgui.cpp;D:\COURSE\OPENGL\FP\FP\x64\Release\imgui.obj
+D:\COURSE\OPENGL\FP\include\imgui\imgui_draw.cpp;D:\COURSE\OPENGL\FP\FP\x64\Release\imgui_draw.obj
+D:\COURSE\OPENGL\FP\include\imgui\imgui_impl_glfw.cpp;D:\COURSE\OPENGL\FP\FP\x64\Release\imgui_impl_glfw.obj
+D:\COURSE\OPENGL\FP\include\imgui\imgui_impl_opengl3.cpp;D:\COURSE\OPENGL\FP\FP\x64\Release\imgui_impl_opengl3.obj
+D:\COURSE\OPENGL\FP\include\imgui\imgui_tables.cpp;D:\COURSE\OPENGL\FP\FP\x64\Release\imgui_tables.obj
+D:\COURSE\OPENGL\FP\include\imgui\imgui_widgets.cpp;D:\COURSE\OPENGL\FP\FP\x64\Release\imgui_widgets.obj
+D:\COURSE\OPENGL\FP\include\stb\stb_vorbis.c;D:\COURSE\OPENGL\FP\FP\x64\Release\stb_vorbis.obj
+D:\COURSE\OPENGL\FP\FP\main.cpp;D:\COURSE\OPENGL\FP\FP\x64\Release\main.obj
+D:\COURSE\OPENGL\FP\FP\src\shader\shader.cpp;D:\COURSE\OPENGL\FP\FP\x64\Release\shader.obj
+D:\COURSE\OPENGL\FP\FP\src\texture\texture.cpp;D:\COURSE\OPENGL\FP\FP\x64\Release\texture.obj
+D:\COURSE\OPENGL\FP\FP\src\texture\texture_array.cpp;D:\COURSE\OPENGL\FP\FP\x64\Release\texture_array.obj

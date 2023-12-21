@@ -1,0 +1,27 @@
+﻿  main.cpp
+D:\COURSE\OPENGL\AS3\AS3\main.cpp(1,1): warning C4819: 檔案含有無法在目前字碼頁 (950) 中表示的字元。請以 Unicode 格式儲存檔案以防止資料遺失
+D:\COURSE\OPENGL\AS3\AS3\src\camera.h(61,24): warning C4244: '正在初始化': 將 'double' 轉換為 'float'，由於類型不同，可能導致資料遺失
+  (編譯來源檔案 'main.cpp')
+  
+D:\COURSE\OPENGL\AS3\AS3\src\scene\Trajectory.h(62,21): warning C4305: '正在初始化': 從 'double' 轉換為 'float'，是由較大的類型轉換為較小的類型，可能導致資料遺失
+  (編譯來源檔案 'main.cpp')
+  
+D:\COURSE\OPENGL\AS3\AS3\src\scene\Trajectory.h(29,26): warning C4244: '正在初始化': 將 'double' 轉換為 'float'，由於類型不同，可能導致資料遺失
+  (編譯來源檔案 'main.cpp')
+  
+D:\COURSE\OPENGL\AS3\AS3\main.cpp(158,40): warning C4244: '=': 將 'double' 轉換為 'float'，由於類型不同，可能導致資料遺失
+D:\COURSE\OPENGL\AS3\AS3\main.cpp(213,22): warning C4244: '正在初始化': 將 'double' 轉換為 'float'，由於類型不同，可能導致資料遺失
+D:\COURSE\OPENGL\AS3\AS3\main.cpp(214,22): warning C4244: '正在初始化': 將 'double' 轉換為 'float'，由於類型不同，可能導致資料遺失
+D:\COURSE\OPENGL\AS3\AS3\main.cpp(222,22): warning C4244: '正在初始化': 將 'double' 轉換為 'float'，由於類型不同，可能導致資料遺失
+D:\COURSE\OPENGL\AS3\AS3\main.cpp(223,22): warning C4244: '正在初始化': 將 'double' 轉換為 'float'，由於類型不同，可能導致資料遺失
+D:\COURSE\OPENGL\AS3\AS3\main.cpp(295,23): warning C4244: '正在初始化': 將 'double' 轉換為 'float'，由於類型不同，可能導致資料遺失
+D:\COURSE\OPENGL\AS3\AS3\main.cpp(452,48): warning C4267: '引數': 將 'size_t' 轉換為 'GLsizei'，資料可能遺失
+D:\COURSE\OPENGL\AS3\AS3\main.cpp(725,52): warning C4267: '+=': 將 'size_t' 轉換為 'unsigned int'，資料可能遺失
+D:\COURSE\OPENGL\AS3\AS3\main.cpp(825,27): warning C4018: '<': signed/unsigned 不相符
+D:\COURSE\OPENGL\AS3\AS3\main.cpp(906,67): warning C4267: '引數': 將 'size_t' 轉換為 'const int'，資料可能遺失
+D:\COURSE\OPENGL\AS3\AS3\main.cpp(913,67): warning C4267: '引數': 將 'size_t' 轉換為 'const int'，資料可能遺失
+  正在產生程式碼
+  Previous IPDB and IOBJ mismatch, fall back to full compilation.
+  All 3043 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
+  已完成程式碼產生
+  AS3.vcxproj -> D:\COURSE\OPENGL\AS3\x64\Release\AS3.exe

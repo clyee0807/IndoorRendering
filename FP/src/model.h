@@ -71,10 +71,7 @@ class Model {
             cout << "MODEL_DIR: " << modelDir << ", NAME: " << modelName << endl;
 
             // Texture class flips UV, so no need for aiProcess_FlipUVs
-            scene = importer.ReadFile(modelPath, aiProcess_JoinIdenticalVertices |
-                aiProcess_Triangulate |
-                aiProcess_GenNormals | 
-                aiProcess_CalcTangentSpace);
+            scene = importer.ReadFile(modelPath, aiProcess_JoinIdenticalVertices | aiProcess_Triangulate | aiProcess_GenNormals | aiProcess_CalcTangentSpace);
             
             loadModel();
         }
@@ -83,7 +80,6 @@ class Model {
             for (unsigned int i = 0; i < numMeshes; i++) {
                 bool hasTexture = meshList[i].texHandle > 0;
                 glUniform1i(glGetUniformLocation(shader.ID, "hasTex"), hasTexture);
-
                 bool hasNormalMap = meshList[i].normHandle > 0;
                 glUniform1i(glGetUniformLocation(shader.ID, "hasNormalMap"), hasNormalMap);
 
@@ -92,11 +88,9 @@ class Model {
                 glUniform4fv(glGetUniformLocation(shader.ID, "material.Ks"), 1, glm::value_ptr(meshList[i].mats.Ks));
                 glUniform1f(glGetUniformLocation(shader.ID, "material.Ns"), meshList[i].mats.Ns);
 
-
                 glActiveTexture(GL_TEXTURE0);
                 glBindTexture(GL_TEXTURE_2D, meshList[i].texHandle);
                 glUniform1i(glGetUniformLocation(shader.ID, "tex"), 0);
-               
                 glActiveTexture(GL_TEXTURE1);
                 glBindTexture(GL_TEXTURE_2D, meshList[i].normHandle);
                 glUniform1i(glGetUniformLocation(shader.ID, "normalMap"), 1);
@@ -131,7 +125,7 @@ class Model {
 
                 // Load textures
                 loadMaterialTextures(material, aiTextureType_DIFFUSE, meshList[i].texHandle);
-                loadMaterialTextures(material, aiTextureType_HEIGHT, meshList[i].normHandle); // aiTextureType_NORMALS
+                loadMaterialTextures(material, aiTextureType_HEIGHT, meshList[i].normHandle);
 
                 // Meshes
                 // Vertices of mesh[i]
@@ -163,21 +157,21 @@ class Model {
                         meshList[i].texCoords.push_back(glm::vec2(0.0f));
 
                     
-                    // Tangents & Bitangents
-                    if (mesh->HasTangentsAndBitangents()) {
-                        glm::vec3 tangent{};
-                        tangent.x = mesh->mTangents[i2].x;
-                        tangent.y = mesh->mTangents[i2].y;
-                        tangent.z = mesh->mTangents[i2].z;
-                        meshList[i].tangent.push_back(tangent);
+                    // Tangents
+                    /*
+                    glm::vec3 tangent{};
+                    tangent.x = mesh->mTangents[i2].x;
+                    tangent.y = mesh->mTangents[i2].y;
+                    tangent.z = mesh->mTangents[i2].z;
+                    meshList[i].tangent.push_back(tangent);
 
-                        glm::vec3 bitangent{};
-                        bitangent.x = mesh->mBitangents[i2].x;
-                        bitangent.y = mesh->mBitangents[i2].y;
-                        bitangent.z = mesh->mBitangents[i2].z;
-                        meshList[i].bitangent.push_back(bitangent);
-                    }
-                    
+                    // Bitangents
+                    glm::vec3 bitangent{};
+                    bitangent.x = mesh->mBitangents[i2].x;
+                    bitangent.y = mesh->mBitangents[i2].y;
+                    bitangent.z = mesh->mBitangents[i2].z;
+                    meshList[i].bitangent.push_back(bitangent);
+                    */
                     
 
                     numVertices++;
@@ -214,8 +208,6 @@ class Model {
             glGenBuffers(1, &meshList[index].VBO1); // Alternative to using 3 separate VBOs, instead use only 1 VBO and set glVertexAttribPointer's offset...
             glGenBuffers(1, &meshList[index].VBO2); // like was done in tutorial 3... Orbiting spinning cubes.
             glGenBuffers(1, &meshList[index].VBO3);
-            glGenBuffers(1, &meshList[index].VBO4);
-            glGenBuffers(1, &meshList[index].VBO5);
             glGenBuffers(1, &meshList[index].EBO);
 
             glBindVertexArray(meshList[index].VAO);
@@ -223,13 +215,15 @@ class Model {
             // Vertex Positions
             glBindBuffer(GL_ARRAY_BUFFER, meshList[index].VBO1);
             glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec3) * meshList[index].vertPositions.size(), meshList[index].vertPositions.data(), GL_STATIC_DRAW);
-            
+            //glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec3) * meshList[index].vertPositions.size(), &meshList[index].vertPositions[0], GL_STATIC_DRAW);
+
             glEnableVertexAttribArray(0); // Void pointer below is for legacy reasons. Two possible meanings: "offset for buffer objects" & "address for client state arrays"
             glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void *)0);
 
             // Vertex Normals
             glBindBuffer(GL_ARRAY_BUFFER, meshList[index].VBO2);
             glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec3) * meshList[index].vertNormals.size(), meshList[index].vertNormals.data(), GL_STATIC_DRAW);
+            //glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec3) * meshList[index].vertNormals.size(), &meshList[index].vertNormals[0], GL_STATIC_DRAW);
 
             glEnableVertexAttribArray(1);
             glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void *)0);
@@ -237,28 +231,32 @@ class Model {
             // Texture Coordinates
             glBindBuffer(GL_ARRAY_BUFFER, meshList[index].VBO3);
             glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec2) * meshList[index].texCoords.size(), meshList[index].texCoords.data(), GL_STATIC_DRAW);
-           
+            //glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec2) * meshList[index].texCoords.size(), &meshList[index].texCoords[0], GL_STATIC_DRAW);
+
             glEnableVertexAttribArray(2);
             glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void *)0);
 
             // Tangents
             glBindBuffer(GL_ARRAY_BUFFER, meshList[index].VBO4);
             glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec3) * meshList[index].tangent.size(), meshList[index].tangent.data(), GL_STATIC_DRAW);
-            
+            //glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec3) * meshList[index].tangent.size(), &meshList[index].tangent[0], GL_STATIC_DRAW);
+
             glEnableVertexAttribArray(3);
             glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
 
             // Bitangents
             glBindBuffer(GL_ARRAY_BUFFER, meshList[index].VBO5);
             glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec3) * meshList[index].bitangent.size(), meshList[index].bitangent.data(), GL_STATIC_DRAW);
-            
+            //glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec3) * meshList[index].bitangent.size(), &meshList[index].bitangent[0], GL_STATIC_DRAW);
+
             glEnableVertexAttribArray(4);
             glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
 
             // Indices for: glDrawElements()
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, meshList[index].EBO);
             glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(unsigned int) * meshList[index].vertIndices.size(), meshList[index].vertIndices.data(), GL_STATIC_DRAW);
-           
+            //glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(unsigned int) * meshList[index].vertIndices.size(), &meshList[index].vertIndices[0], GL_STATIC_DRAW);
+
             glBindVertexArray(0); // Unbind VAO
         }
 

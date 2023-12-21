@@ -39,7 +39,6 @@ bool enableDebugMode = false;
 vec3 objectPos(3.0f, 1.0f, -1.5f), moveVec(0.0f), forwardVec(0.0f), rightVec(0.0f);
 GLfloat baseMoveStep = 0.01f, runFactor = 1.5;
 GLfloat moveStep = baseMoveStep;
-
 // Position & Rotation
 bool isMovingW = false, isMovingS = false, isMovingA = false, isMovingD = false, isMovingUp = false, isMovingDown = false;
 bool isMoving = false;
@@ -61,9 +60,7 @@ GLuint rectVAO, rectVBO;
 GLuint currentTexture;
 FBO sceneFBO;
 bool captureScreen = false;
-bool useNormalMap = false;
-bool useBlinnPhong = false;
-
+bool useNormalMap = true;
 // Cel Shading
 FBO celFBO;
 bool cel = false;
@@ -252,8 +249,6 @@ void renderModel(const Model& model, Shader& shader, const mat4& mvMat, const ma
 
     GLint useNM = glGetUniformLocation(shader.ID, "useNormalMap");
     glUniform1i(useNM, useNormalMap ? 1 : 0);
-    GLint useBP = glGetUniformLocation(shader.ID, "useBlinnPhong");
-    glUniform1i(useBP, useBlinnPhong ? 1 : 0);
 
     GLint MMV = glGetUniformLocation(shader.ID, "MMV");
     glUniformMatrix4fv(MMV, 1, GL_FALSE, value_ptr(mvMat));
@@ -341,7 +336,6 @@ void renderGeneralMenu() {
 
     //
     ImGui::Checkbox("Enable Normal Map", &useNormalMap);
-    ImGui::Checkbox("Enable Blinn Phong", &useBlinnPhong);
 
     ImGui::End();
 }
@@ -589,16 +583,11 @@ int main(void) {
     Shader finalSP("FP/shaders/filter.vert", "FP/shaders/final.frag");
 
     // Models
+    //cout << glGetError() << endl;
     Model room("FP/models/Grey White Room.obj");
+    //cout << glGetError() << endl;
     Model trice("FP/models/Trice.obj");
 
-    cout << "trice:\n";
-    cout << "    meshList.size = " << trice.meshList.size() << "\n";
-    cout << "    textureList.size = " << trice.textureList.size() << "\n";
-    cout << "    textureList[0] = " << trice.textureList[0].ID << "\n";
-    cout << "    meshList[0].normHandle = " << trice.meshList[0].normHandle << "\n";
-    cout << "    meshList[0].VBO4 = " << trice.meshList[0].VBO4 << "\n";
-    cout << "    meshList[0].VBO5 = " << trice.meshList[0].VBO5 << "\n";
 
 
     // Render loop

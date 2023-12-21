@@ -1,0 +1,12 @@
+C:\GPA_final\IndoorRendering\include\glad\glad.c;C:\GPA_final\IndoorRendering\FP\x64\Debug\glad.obj
+C:\GPA_final\IndoorRendering\include\imgui\imgui.cpp;C:\GPA_final\IndoorRendering\FP\x64\Debug\imgui.obj
+C:\GPA_final\IndoorRendering\include\imgui\imgui_draw.cpp;C:\GPA_final\IndoorRendering\FP\x64\Debug\imgui_draw.obj
+C:\GPA_final\IndoorRendering\include\imgui\imgui_impl_glfw.cpp;C:\GPA_final\IndoorRendering\FP\x64\Debug\imgui_impl_glfw.obj
+C:\GPA_final\IndoorRendering\include\imgui\imgui_impl_opengl3.cpp;C:\GPA_final\IndoorRendering\FP\x64\Debug\imgui_impl_opengl3.obj
+C:\GPA_final\IndoorRendering\include\imgui\imgui_tables.cpp;C:\GPA_final\IndoorRendering\FP\x64\Debug\imgui_tables.obj
+C:\GPA_final\IndoorRendering\include\imgui\imgui_widgets.cpp;C:\GPA_final\IndoorRendering\FP\x64\Debug\imgui_widgets.obj
+C:\GPA_final\IndoorRendering\include\stb\stb_vorbis.c;C:\GPA_final\IndoorRendering\FP\x64\Debug\stb_vorbis.obj
+C:\GPA_final\IndoorRendering\FP\main.cpp;C:\GPA_final\IndoorRendering\FP\x64\Debug\main.obj
+C:\GPA_final\IndoorRendering\FP\src\shader\shader.cpp;C:\GPA_final\IndoorRendering\FP\x64\Debug\shader.obj
+C:\GPA_final\IndoorRendering\FP\src\texture\texture.cpp;C:\GPA_final\IndoorRendering\FP\x64\Debug\texture.obj
+C:\GPA_final\IndoorRendering\FP\src\texture\texture_array.cpp;C:\GPA_final\IndoorRendering\FP\x64\Debug\texture_array.obj

@@ -1,6 +1,8 @@
 #include <iostream>
 #include <filesystem>
 #include <cmath>
+#include <iomanip>
+#include <ctime>
 
 // #define VSYNC_DISABLED
 #include <imgui/imgui.h>
@@ -37,7 +39,8 @@ const int BASE_WINDOW_WIDTH = 1600, BASE_WINDOW_HEIGHT = 900;
 int windowWidth = BASE_WINDOW_WIDTH, windowHeight = BASE_WINDOW_HEIGHT;
 mat4 Mvp(1.0f), Mv(1.0f), Mp(1.0f);
 bool isFullscreen = false, showMenu = true, tabPressed = false;
-bool enableDebugMode = true;
+bool isMenuHovered = false;
+bool enableDebugMode = false;
 bool captureScreen = false;
 
 // Object
@@ -105,7 +108,7 @@ mat4 MPLSv(1.0f), MPLS(1.0f);
 
 // Shaders
 GLuint rectVAO, rectVBO, currentTexture;
-FBO sceneFBO(windowWidth, windowHeight, FBOType::FBOType_Normal);
+FBO sceneFBO(windowWidth, windowHeight, FBOType::FBOType_2D);
 bool useNormalMap = true;
 // Blinn-Phong
 bool enableBP = true;
@@ -113,18 +116,29 @@ bool enableBP = true;
 FBO dsmFBO(1024, 1024, FBOType::FBOType_Depth);
 bool enableDSM = true;
 // Point Light (Shadow)
-FBO plFBO(windowWidth, windowHeight, FBOType::FBOType_Normal);
+FBO plFBO(windowWidth, windowHeight, FBOType::FBOType_2D);
 FBO plsFBO(1024, 1024, FBOType::FBOType_Depth);
 bool enablePL = true;
 // Bloom
-FBO brightPassFBO(windowWidth, windowHeight, FBOType::FBOType_Normal); 
-FBO gaussianHFBO(windowWidth, windowHeight, FBOType::FBOType_Normal);
-FBO gaussianVFBO(windowWidth, windowHeight, FBOType::FBOType_Normal);
-FBO bloomFBO(windowWidth, windowHeight, FBOType::FBOType_Normal);
+FBO brightPassFBO(windowWidth, windowHeight, FBOType::FBOType_2D);
+FBO gaussianHFBO(windowWidth, windowHeight, FBOType::FBOType_2D);
+FBO gaussianVFBO(windowWidth, windowHeight, FBOType::FBOType_2D);
+FBO bloomFBO(windowWidth, windowHeight, FBOType::FBOType_2D);
 float brightnessThreshold = 0.55, strength = 4.0;
-// Cel Shading
-FBO celFBO(windowWidth, windowHeight, FBOType::FBOType_Normal);
-bool enableCel = false;
+// NPR
+FBO edgeFBO(windowWidth, windowHeight, FBOType::FBOType_2D);
+bool enableNPR = true;
+float edgeThreshold = 0.8;
+// FXAA
+FBO fxaaFBO(windowWidth, windowHeight, FBOType::FBOType_2D);
+bool enableFXAA = true;
+const char* FXAA_LEVELS[] = { "3", "4", "5" };
+const char* fxaaLevel = FXAA_LEVELS[2];
+
+// Screenshot
+const char* SS_FORMATS[] = { "JPEG", "PNG" };
+const char* ssFormat = SS_FORMATS[0];
+bool ignoreAlpha = false;
 
 
 
@@ -260,11 +274,11 @@ static void mouseButtonCallback(GLFWwindow* window, int button, int action, int 
 }
 
 static void scrollCallback(GLFWwindow* window, double xoffset, double yoffset) {
-    if (yoffset > 0) {
-        camera.zoomIn();
-    }
-    else if (yoffset < 0) {
-        camera.zoomOut();
+    if (!isMenuHovered || camera.enableMotion) {
+        if (yoffset > 0)
+            camera.zoomIn();
+        else if (yoffset < 0)
+            camera.zoomOut();
     }
 }
 
@@ -286,8 +300,11 @@ static void frameBufferSizeCallback(GLFWwindow* window, int width, int height) {
     gaussianVFBO.resize(width, height);
     bloomFBO.resize(width, height);
 
-    // Cel
-    celFBO.resize(width, height);
+    // NPR
+    edgeFBO.resize(width, height);
+    
+    // FXAA
+    fxaaFBO.resize(width, height);
 }
 
 
@@ -366,6 +383,7 @@ static void renderModel(const Model& model, Shader& shader, GLuint shadowMap, co
     shader.setInt("useNM", useNormalMap);
     shader.setInt("enableBP", enableBP);
     shader.setInt("enableDSM", enableDSM);
+    shader.setInt("enableNPR", enableNPR);
 
     model.render(shader);
 }
@@ -412,7 +430,7 @@ static void renderFullScreenQuad(GLuint texture) {
     glBindVertexArray(0);
 }
 
-void bloomFilter(Shader& brightPassShader, Shader& gaussianShader, Shader& bloomShader) {
+static void bloomFilter(Shader& brightPassShader, Shader& gaussianShader, Shader& bloomShader) {
     // Bright pass + Gaussian blur
     //brightPassFBO.bind();
     //brightPassShader.activate();
@@ -451,8 +469,44 @@ void bloomFilter(Shader& brightPassShader, Shader& gaussianShader, Shader& bloom
     //currentTexture = bloomFBO.getTexture();
 }
 
-void celShading() {
-    currentTexture = celFBO.getTexture();
+static void npr(Shader& nprShader) {
+    edgeFBO.bind();
+    nprShader.activate();
+    nprShader.setInt("currentTex", 0);
+    nprShader.setFloat("threshold", edgeThreshold);
+    renderFullScreenQuad(currentTexture);
+    edgeFBO.unbind();
+
+    currentTexture = edgeFBO.getTexture();
+}
+
+static void fxaaSetParams(Shader& fxaaShader, int level) {
+    switch (level) {
+        case 3:
+            fxaaShader.setFloat("FXAA_EDGE_THRESHOLD_MIN", (1.0 / 16.0));
+            fxaaShader.setInt("FXAA_SEARCH_STEPS", 16);
+            break;
+        case 4:
+            fxaaShader.setFloat("FXAA_EDGE_THRESHOLD_MIN", (1.0 / 24.0));
+            fxaaShader.setInt("FXAA_SEARCH_STEPS", 24);
+            break;
+        case 5:
+            fxaaShader.setFloat("FXAA_EDGE_THRESHOLD_MIN", (1.0 / 24.0));
+            fxaaShader.setInt("FXAA_SEARCH_STEPS", 32);
+            break;
+        }
+}
+
+static void fxaa(Shader& celShader, Shader& fxaaShader) {
+    fxaaFBO.bind();
+    fxaaShader.activate();
+    fxaaShader.setInt("currentTex", 0);
+    fxaaShader.setVec2("texSize", vec2(windowWidth, windowHeight));
+    fxaaSetParams(fxaaShader, stoi(fxaaLevel));
+    renderFullScreenQuad(currentTexture);
+    fxaaFBO.unbind();
+
+    currentTexture = fxaaFBO.getTexture();
 }
 
 
@@ -493,7 +547,7 @@ static void renderFramerateWidget(ImGuiIO& io) {
     char overlay[32];
     sprintf(overlay, "%.2f FPS (avg %.3f ms)", average, 1000.0f / average);
     ImGui::PlotLines("Framerate", values, IM_ARRAYSIZE(values), valuesOffset, overlay, 0.0f, 200.0f, ImVec2(0, 60.0f));
-    ImGui::Text("Sampling Rate:");
+    ImGui::Text("Sampling Rate");
     ImGui::RadioButton("10", &samplingRate, 10); ImGui::SameLine();
     ImGui::RadioButton("50", &samplingRate, 50); ImGui::SameLine();
     ImGui::RadioButton("100", &samplingRate, 100); ImGui::SameLine();
@@ -582,6 +636,21 @@ static void renderGeneralMenu() {
     ImGui::SliderFloat("Hor. Sen.", &mouse.xStep, 1.0f, 10.0f, "%.1f");
     ImGui::SliderFloat("Ver. Sen.", &mouse.yStep, 1.0f, 10.0f, "%.1f");
 
+    // Screenshot
+    ImGui::SeparatorText("Screenshot");
+    ImGui::SetNextItemOpen(true, ImGuiCond_Once);
+    if (ImGui::BeginCombo("Output Format", ssFormat)) {
+        for (int i = 0; i < IM_ARRAYSIZE(SS_FORMATS); i++) {
+            const bool isSelected = (SS_FORMATS[i] == ssFormat);
+            if (ImGui::Selectable(SS_FORMATS[i], isSelected))
+                ssFormat = SS_FORMATS[i];
+            if (isSelected)
+                ImGui::SetItemDefaultFocus();
+        }
+        ImGui::EndCombo();
+    }
+    if (ssFormat == "PNG") ImGui::Checkbox("Ignore alpha channel", &ignoreAlpha);
+
     ImGui::End();
 }
 
@@ -632,7 +701,40 @@ static void renderLightShadeMenu() {
     // Shading
     ImGui::SetNextItemOpen(true, ImGuiCond_Once);
     if (ImGui::CollapsingHeader("Shading")) {
+        // Shading - Normal Mapping
         ImGui::Checkbox("Enable Normal Map", &useNormalMap);
+
+        // Shading - NPR
+        ImGui::SetNextItemOpen(true, ImGuiCond_Once);
+        if (ImGui::TreeNode("NPR")) {
+            ImGui::Checkbox("Enable NPR", &enableNPR);
+            if (enableNPR) {
+                ImGui::SliderFloat("Edge Threshold", &edgeThreshold, 0.4f, 1.0f, "%.1f");
+            }
+
+            ImGui::TreePop();
+        }
+
+        // Shading - FXAA
+        ImGui::SetNextItemOpen(true, ImGuiCond_Once);
+        if (ImGui::TreeNode("FXAA")) {
+            ImGui::Checkbox("Enable FXAA", &enableFXAA);
+            if (enableFXAA) {
+                if (ImGui::BeginCombo("Level", fxaaLevel)) {
+                    for (int i = 0; i < IM_ARRAYSIZE(FXAA_LEVELS); i++) {
+                        const bool isSelected = (FXAA_LEVELS[i] == fxaaLevel);
+                        if (ImGui::Selectable(FXAA_LEVELS[i], isSelected))
+                            fxaaLevel = FXAA_LEVELS[i];
+                        if (isSelected)
+                            ImGui::SetItemDefaultFocus();
+                    }
+
+                    ImGui::EndCombo();
+                }
+            }
+
+            ImGui::TreePop();
+        }
     }
 
     ImGui::End();
@@ -867,6 +969,42 @@ static void init() {
     }
 }
 
+static void screenshot() {
+    auto t = time(nullptr);
+    auto tm = *localtime(&t);
+    int year2d = (tm.tm_year + 1900) % 100;
+    ostringstream oss;
+    oss << setw(2) << setfill('0') << year2d << "_";
+    oss << put_time(&tm, "%m_%d-%H_%M_%S");
+    auto str = oss.str();
+
+    string filename = "OUTPUT_" + str;
+    string file;
+
+    GLubyte* pixels = new GLubyte[windowWidth * windowHeight * 4];
+    glReadPixels(0, 0, windowWidth, windowHeight, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+    flipImageVertically(pixels, windowWidth, windowHeight, 4);
+
+    bool saveSuccessed = false;
+    if (ssFormat == "JPEG") {
+        file = filename + ".jpg";
+        if (stbi_write_jpg(file.c_str(), windowWidth, windowHeight, 4, pixels, windowWidth * 4))
+            saveSuccessed = true;
+    }
+    else if (ssFormat == "PNG") {
+        file = filename + ".png";
+        if (stbi_write_png(file.c_str(), windowWidth, windowHeight, 4, pixels, windowWidth * 4))
+            saveSuccessed = true;
+    }
+    else {
+        cerr << "SCREENSHOT::ERROR: Failed to save image." << endl;
+    }
+
+    if (saveSuccessed) cout << "Saved image to '" << file << "'" << endl;
+    delete[] pixels;
+    captureScreen = false;
+}
+
 
 
 /* ---------------------------- MAIN ---------------------------- */
@@ -892,8 +1030,13 @@ int main(void) {
     Shader brightPassSP("FP/shaders/filter.vert", "FP/shaders/bright_pass.frag");
     Shader gaussianSP("FP/shaders/filter.vert", "FP/shaders/gaussian_blur.frag");
     Shader bloomSP("FP/shaders/filter.vert", "FP/shaders/bloom.frag");
-    // Cel
+
+    // Shading
+    // NPR
     Shader celSP("FP/shaders/filter.vert", "FP/shaders/cel.frag");
+    Shader edgeSP("FP/shaders/filter.vert", "FP/shaders/edge_detection.frag");
+    // FXAA
+    Shader fxaaSP("FP/shaders/filter.vert", "FP/shaders/fxaa.frag");
     // Output
     Shader finalSP("FP/shaders/filter.vert", "FP/shaders/final.frag");
 
@@ -909,8 +1052,11 @@ int main(void) {
     dsmFBO.init();
     // P, A, V Lights
     plFBO.init();
-    celFBO.init();
-
+    // NPR
+    edgeFBO.init();
+    // FXAA
+    fxaaFBO.init();
+    
 
 
 #ifdef VSYNC_DISABLED
@@ -924,6 +1070,7 @@ int main(void) {
         if (showMenu) startImGuiFrame();
 
         // Update cursor position, camera position, MVP
+        isMenuHovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow);
         glfwGetCursorPos(window, &mouse.lastCursorPos.x, &mouse.lastCursorPos.y);
         updateObjectPosition();
         camera.focus = vec3(objectPos);
@@ -954,41 +1101,36 @@ int main(void) {
 //#pragma endregion
 
 #pragma region DEFFERED
-        gbo.bindWrite();
-        cout << "GBO_BIND: " << glGetError() << endl;
-        geometrySP.activate();
-        cout << "GSP_ON: " << glGetError() << endl;
-        renderScene(room, trice, geometrySP);
-        // renderModel(sphere, geometrySP, Mpl, Mv, Mp);
-        cout << "RENDER: " << glGetError() << endl;
-        gbo.unbind();
-        cout << "GBO_UNBIND: " << glGetError() << endl;
+        // ...And another thing — do NOT forget to disable GL_BLEND.  — anossovp, 8 years ago
+        // If I were find this comment a week ago, that would save a LOT of debugging  — Sandor Muranyi, 6 years ago
+        // https://learnopengl.com/Lighting/Multiple-lights
+        glDisable(GL_BLEND);
 
-        currentTexture = gbo.getTexture(GBO_TEXTURE_TYPE_AMBIENT);
+        gbo.bindWrite();
+        geometrySP.activate();
+        renderScene(room, trice, geometrySP);
+        gbo.unbind();
+        // glEnable(GL_BLEND);
+
+        currentTexture = gbo.getTexture(GBO_TEXTURE_TYPE_VERTEX);
 #pragma endregion
+
+        // FXAA, NPR
+        if (enableNPR)
+            npr(edgeSP);
+        if (enableFXAA)
+            fxaa(celSP, fxaaSP);
 
         // Render final result to screen
         finalSP.activate();
-        finalSP.setInt("tex", 0);
+        finalSP.setInt("currentTex", 0);
         renderFullScreenQuad(currentTexture);
         
 
 
         // Screen capturing
-        if (captureScreen) {
-            GLubyte* pixels = new GLubyte[windowWidth * windowHeight * 4];
-            glReadPixels(0, 0, windowWidth, windowHeight, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
-            flipImageVertically(pixels, windowWidth, windowHeight, 4);
-
-            if (stbi_write_png("output.png", windowWidth, windowHeight, 4, pixels, windowWidth * 4)) {
-                cout << "Saved image to 'output.png'" << endl;
-            }
-            else {
-                cerr << "Failed to save image." << endl;
-            }
-            delete[] pixels;
-            captureScreen = false;
-        }
+        if (captureScreen)
+            screenshot();
 
         // ImGui
         if (showMenu) {

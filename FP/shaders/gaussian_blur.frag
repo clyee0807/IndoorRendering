@@ -4,7 +4,7 @@ uniform sampler2D brightTex;
 uniform bool isHorizontal;
 uniform float sigma; // The standard deviation of the blur
 
-in vec2 texCoord;
+in vec2 texCoords;
 out vec4 fragColor;
 
 const int kernelSize = 11; // Number of samples in one direction; total samples = kernelSize^2
@@ -24,7 +24,7 @@ void main() {
     for (int i = -kernelSize / 2; i <= kernelSize / 2; ++i) {
         float weight = gaussian(float(i), sigma);
         vec2 offset = isHorizontal ? vec2(tex_offset.x * float(i), 0.0) : vec2(0.0, tex_offset.y * float(i));
-        blur += texture(brightTex, texCoord + offset) * weight;
+        blur += texture(brightTex, texCoords + offset) * weight;
         totalWeight += weight;
     }
 

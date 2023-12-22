@@ -80,7 +80,7 @@ class GBO {
 
             // Unbind the framebuffer
             glBindTexture(GL_TEXTURE_2D, 0);
-            glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
         }
 
         void resize(int newWidth, int newHeight) {
@@ -95,8 +95,8 @@ class GBO {
         }
 
         void bindWrite() const {
-            glBindFramebuffer(GL_DRAW_FRAMEBUFFER, gbo);
-            glClearColor(0.098039f, 0.164706f, 0.317647f, 1.0f);
+            glBindFramebuffer(GL_FRAMEBUFFER, gbo);
+            glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         }
 

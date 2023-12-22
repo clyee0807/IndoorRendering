@@ -1,9 +1,15 @@
+# Directories
 .vs/
 x64/
 FP/x64/
 RD_SS/
 
+# Output Images
+/OUTPUT_*
+
+# ImGui History
 imgui.ini
 
+# Guideline & Report
 *.docx
 *.pdf

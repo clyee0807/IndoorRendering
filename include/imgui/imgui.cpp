@@ -3403,7 +3403,7 @@ void ImGui::RenderTextClippedEx(ImDrawList* draw_list, const ImVec2& pos_min, co
 void ImGui::RenderTextClipped(const ImVec2& pos_min, const ImVec2& pos_max, const char* text, const char* text_end, const ImVec2* text_size_if_known, const ImVec2& align, const ImRect* clip_rect)
 {
     // Hide anything after a '##' string
-    const char* text_display_end = FindRenderedTextEnd(text, text_end);
+        const char* text_display_end = FindRenderedTextEnd(text, text_end);
     const int text_len = (int)(text_display_end - text);
     if (text_len == 0)
         return;

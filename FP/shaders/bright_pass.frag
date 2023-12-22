@@ -3,11 +3,11 @@
 uniform sampler2D sceneTex;
 uniform float brightnessThreshold;
 
-in vec2 texCoord;
+in vec2 texCoords;
 out vec4 fragColor;
 
 void main() {
-    vec4 color = texture(sceneTex, texCoord);
+    vec4 color = texture(sceneTex, texCoords);
 
     // Luminance
     float brightness = dot(color.rgb, vec3(0.2126, 0.7152, 0.0722));

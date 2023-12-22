@@ -41,6 +41,6 @@ void main() {
     outNormal = (hasNM && useNM) ? normalize(fs_in.TBN * normalMap) : fs_in.TBN[2];
     outDiffuse = hasTex ? texColor.rgb : material.Kd.rgb;
     // outAmbient = material.Ka.rgb;
-    outAmbient = vec3(0.960784f, 0.901961f, 0.909804f);
+    outAmbient = material.Kd.rgb;
     outSpecular = material.Ks.rgb;
 }

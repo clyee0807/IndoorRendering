@@ -2,7 +2,7 @@
 
 layout(location = 0) out vec4 fragColor;
 
-in vec2 texCoord;
+in vec2 texCoords;
 
 // Shading
 uniform bool hasTex;
@@ -36,7 +36,7 @@ uniform AreaLight areaLight;
 uniform VolumeLight volumeLight;
 
 void main() {     
-    vec4 textureColor = texture(tex, texCoord);
+    vec4 textureColor = texture(tex, texCoords);
 	vec3 Kd = hasTex ? textureColor.rgb : material.Kd.rgb;
 
     switch (lightType) {

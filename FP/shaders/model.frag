@@ -12,7 +12,7 @@ in VS_OUT {
 } fs_in;
 
 in vec4 fragPosLightSpace;
-in vec2 texCoord;
+in vec2 texCoords;
 
 // Shading
 uniform bool hasTex;
@@ -89,8 +89,8 @@ float dsmCalculation(vec3 N, vec3 L) {
 
 /* ---------------------------- MAIN ---------------------------- */
 void main() {
-    vec4 textureColor = texture(tex, texCoord);
-    vec3 normalMap = texture(normalMap, texCoord).rgb;
+    vec4 textureColor = texture(tex, texCoords);
+    vec3 normalMap = texture(normalMap, texCoords).rgb;
     normalMap = normalMap * 2.0 - 1.0;
 
     // TBN

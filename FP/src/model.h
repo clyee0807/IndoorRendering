@@ -86,7 +86,7 @@ class Model {
                 shader.setTexture("tex", meshList[i].texHandle, 0);
                 shader.setTexture("normalMap", meshList[i].normHandle, 1);
 
-                // Lighting - Blinn-Phong
+                // Material
                 shader.setVec4("material.Ka", meshList[i].mats.Ka);
                 shader.setVec4("material.Kd", meshList[i].mats.Kd);
                 shader.setVec4("material.Ks", meshList[i].mats.Ks);
@@ -110,6 +110,7 @@ class Model {
             processNode();
         }
 
+        // Good article about MTL content: https://www.twblogs.net/a/5c287f8abd9eee16b3dbe174
         void processNode() {
             aiMesh *mesh{};
 

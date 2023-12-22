@@ -21,6 +21,7 @@
 #include "mouse.h"
 #include "camera.h"
 #include "fbo.h"
+#include "gbo.h"
 #include "shader/shader.h"
 #include "texture/texture.h"
 
@@ -36,10 +37,13 @@ const int BASE_WINDOW_WIDTH = 1600, BASE_WINDOW_HEIGHT = 900;
 int windowWidth = BASE_WINDOW_WIDTH, windowHeight = BASE_WINDOW_HEIGHT;
 mat4 Mvp(1.0f), Mv(1.0f), Mp(1.0f);
 bool isFullscreen = false, showMenu = true, tabPressed = false;
-bool enableDebugMode = false;
+bool enableDebugMode = true;
 bool captureScreen = false;
 
 // Object
+GBO gbo(windowWidth, windowHeight);
+// Please ensure applying the matrices in STR order (R * T * S), or else you'd think
+// you're bad at OpenGL, because the trice won't fuckin MOVE
 // Focus
 vec3 objectPos(3.0f, 1.0f, -1.5f), moveVec(0.0f), forwardVec(0.0f), rightVec(0.0f);
 GLfloat baseMoveStep = 0.01f, runFactor = 1.5;
@@ -49,11 +53,15 @@ bool isMoving = false;
 // Trice
 vec3 tricePos(2.05, 0.628725, -1.9);
 float triceScale = 0.001f;
-// Please ensure applying the matrices in STR order (R * T * S), or else you'd think
-// you're bad at OpenGL, because the trice won't fuckin MOVE
 mat4 MtriceS = scale(mat4(1.0f), vec3(triceScale));
 mat4 MtriceT = translate(mat4(1.0f), tricePos);
 mat4 Mtrice = MtriceT * MtriceS;
+// Point Light (sphere)
+vec3 pLightPos(1.87659, 0.4625, 0.103928);
+float pLightScale = 0.22f;
+mat4 MplS = scale(mat4(1.0f), vec3(pLightScale));
+mat4 MplT(1.0f);
+mat4 Mpl(1.0f);
 
 // Camera
 float fov = radians(60.0f);
@@ -73,6 +81,27 @@ mat4 MDSMp = ortho(DSM_RANGE / -2, DSM_RANGE / 2, DSM_RANGE / -2, DSM_RANGE / 2,
 mat4 MDSMv(1.0f), MDSM(1.0f);
 int sampleRadius = 4;
 float shadowBias = 0.025f, biasVariation = 0.03f;
+// P, A, V Lights
+enum class LightType {
+    LightType_Point = 0,
+    LightType_Area = 1,
+    LightType_Volume = 2,
+};
+struct PointLight {
+    float constant;
+    float linear;
+    float quadratic;
+};
+struct AreaLight {
+    vec3 position;
+};
+struct VolumeLight {
+    vec3 position;
+};
+// Point Light (Shadow)
+const float PLS_RANGE = 5.0f, PLS_NEAR = 0.22f, PLS_FAR = 10.0f;
+mat4 MPLSp = ortho(PLS_RANGE / -2, PLS_RANGE / 2, PLS_RANGE / -2, PLS_RANGE / 2, PLS_NEAR, PLS_FAR);
+mat4 MPLSv(1.0f), MPLS(1.0f);
 
 // Shaders
 GLuint rectVAO, rectVBO, currentTexture;
@@ -83,6 +112,16 @@ bool enableBP = true;
 // Directional Shadow Mapping
 FBO dsmFBO(1024, 1024, FBOType::FBOType_Depth);
 bool enableDSM = true;
+// Point Light (Shadow)
+FBO plFBO(windowWidth, windowHeight, FBOType::FBOType_Normal);
+FBO plsFBO(1024, 1024, FBOType::FBOType_Depth);
+bool enablePL = true;
+// Bloom
+FBO brightPassFBO(windowWidth, windowHeight, FBOType::FBOType_Normal); 
+FBO gaussianHFBO(windowWidth, windowHeight, FBOType::FBOType_Normal);
+FBO gaussianVFBO(windowWidth, windowHeight, FBOType::FBOType_Normal);
+FBO bloomFBO(windowWidth, windowHeight, FBOType::FBOType_Normal);
+float brightnessThreshold = 0.55, strength = 4.0;
 // Cel Shading
 FBO celFBO(windowWidth, windowHeight, FBOType::FBOType_Normal);
 bool enableCel = false;
@@ -237,7 +276,17 @@ static void frameBufferSizeCallback(GLFWwindow* window, int width, int height) {
     glViewport(0, 0, width, height);
 
     // FBO resize
+    gbo.resize(width, height);
     sceneFBO.resize(width, height);
+
+    // Bloom
+    plFBO.resize(width, height);
+    brightPassFBO.resize(width, height);
+    gaussianHFBO.resize(width, height);
+    gaussianVFBO.resize(width, height);
+    bloomFBO.resize(width, height);
+
+    // Cel
     celFBO.resize(width, height);
 }
 
@@ -264,16 +313,40 @@ static void updateMVP() {
     Mv = camera.viewMatrix();
     Mvp = Mp * Mv;
 
+    // Point Light (sphere)
+    MplT = translate(mat4(1.0f), pLightPos);
+    Mpl = MplT * MplS;
+
     // Lighting
     MDSMv = lookAt(lightPos, DSM_TARGET, UP_VEC);
     MDSM = MDSMp * MDSMv;
 }
-
 static void updateObjectPosition() {
     if (isMoving) {
         objectPos += moveVec * moveStep;
     }
 }
+
+// =====================================================================================
+static void renderModel(const Model& model, Shader& shader, const mat4& mMat, const mat4& vMat, const mat4& pMat) {
+    // MVP
+    shader.setMat4("MM", mMat);
+    shader.setMat4("MV", vMat);
+    shader.setMat4("MP", pMat);
+
+    // Options
+    shader.setInt("useNM", useNormalMap);
+
+    model.render(shader);
+}
+
+static void renderScene(const Model& MODEL_ROOM, const Model& MODEL_TRICE, Shader& shader) {
+    shader.activate();
+    
+    renderModel(MODEL_ROOM, shader, mat4(1.0f), Mv, Mp);
+    renderModel(MODEL_TRICE, shader, Mtrice, Mv, Mp);
+}
+// =====================================================================================
 
 static void renderModel(const Model& model, Shader& shader, GLuint shadowMap, const mat4& mMat, const mat4& vMat, const mat4& pMat) {
     // MVP
@@ -293,7 +366,7 @@ static void renderModel(const Model& model, Shader& shader, GLuint shadowMap, co
     shader.setInt("useNM", useNormalMap);
     shader.setInt("enableBP", enableBP);
     shader.setInt("enableDSM", enableDSM);
-    
+
     model.render(shader);
 }
 
@@ -315,15 +388,67 @@ static void renderSceneDSM(const Model& MODEL_ROOM, const Model& MODEL_TRICE, Sh
     MODEL_TRICE.render(shader);
 }
 
+static void renderLight(const Model& MODEL_LIGHT, Shader& shader, LightType type) {
+    shader.activate();
+
+    // MVP
+    shader.setMat4("MM", Mpl);
+    shader.setMat4("MV", Mv);
+    shader.setMat4("MP", Mp);
+
+    // Options
+    shader.setInt("isLight", true);
+    shader.setInt("lightType", static_cast<int>(type));
+
+    MODEL_LIGHT.render(shader);
+}
+
 static void renderFullScreenQuad(GLuint texture) {
     glBindVertexArray(rectVAO);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    glDisable(GL_DEPTH_TEST);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, texture);
     glDrawArrays(GL_TRIANGLES, 0, 6);
     glBindVertexArray(0);
-    glEnable(GL_DEPTH_TEST);
+}
+
+void bloomFilter(Shader& brightPassShader, Shader& gaussianShader, Shader& bloomShader) {
+    // Bright pass + Gaussian blur
+    //brightPassFBO.bind();
+    //brightPassShader.activate();
+    //glUniform1i(glGetUniformLocation(brightPassShader.getID(), "screenTex"), 0);
+    //glUniform1f(glGetUniformLocation(brightPassShader.getID(), "brightnessThreshold"), brightnessThreshold);
+    //renderFullScreenQuad(currentTexture);
+    //brightPassFBO.unbind();
+
+
+    //gaussianShader.activate();
+    //glUniform1i(glGetUniformLocation(gaussianShader.getID(), "brightTex"), 0);
+
+    //gaussianHFBO.bind();
+    //glUniform1i(glGetUniformLocation(gaussianShader.getID(), "isHorizontal"), GL_TRUE);
+    //glUniform1f(glGetUniformLocation(gaussianShader.getID(), "sigma"), strength);
+    //renderFullScreenQuad(brightPassFBO.getTexture());
+    //gaussianHFBO.unbind();
+
+    //gaussianVFBO.bind();
+    //glUniform1i(glGetUniformLocation(gaussianShader.getID() "isHorizontal"), GL_FALSE);
+    //renderFullScreenQuad(gaussianHFBO.getTexture());
+    //gaussianVFBO.unbind();
+
+    //// Bloom
+    //bloomFBO.bind();
+    //bloomShader.activate();
+    //glUniform1i(glGetUniformLocation(bloomShader.getID(), "originalSceneTex"), 0);
+    //glActiveTexture(GL_TEXTURE0);
+    //glBindTexture(GL_TEXTURE_2D, currentTexture);
+    //glUniform1i(glGetUniformLocation(bloomShader.getID(), "blurredBrightTex"), 1);
+    //glActiveTexture(GL_TEXTURE1);
+    //glBindTexture(GL_TEXTURE_2D, gaussianVFBO.getTexture());
+    //renderFullScreenQuad();
+    //bloomFBO.unbind();
+
+    //currentTexture = bloomFBO.getTexture();
 }
 
 void celShading() {
@@ -460,27 +585,55 @@ static void renderGeneralMenu() {
     ImGui::End();
 }
 
-static void renderLightingMenu() {
+static void renderLightShadeMenu() {
     ImGui::Begin("Lighting & Shading", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
     // Lighting
-    ImGui::SeparatorText("Lighting");
-    ImGui::DragFloat3("Light Pos.", (float*)&lightPos, 0.01f, -3.0f, 3.0f, "%.2f");
+    ImGui::SetNextItemOpen(true, ImGuiCond_Once);
+    if (ImGui::CollapsingHeader("Lighting")) {
+        // Lighting - Basic
+        ImGui::SetNextItemOpen(true, ImGuiCond_Once);
+        if (ImGui::TreeNode("Basic")) {
+            ImGui::DragFloat3("Position", (float*)&lightPos, 0.01f, -3.0f, 3.0f, "%.2f"); ImGui::SameLine(); ImGui::TextDisabled("(?)");
+            if (ImGui::IsItemHovered()) {
+                ImGui::BeginTooltip();
+                ImGui::Text("Both Blinn-Phong and DSM would be affected.");
+                ImGui::EndTooltip();
+            }
+            ImGui::Checkbox("Enable Blinn-Phong", &enableBP);
 
-    // Lighting - Directional Shadow Mapping
-    ImGui::Checkbox("Enable Blinn-Phong", &enableBP);
+            ImGui::TreePop();
+        }
 
-    // Lighting - Directional Shadow Mapping
-    ImGui::Checkbox("Enable DSM", &enableDSM);
-    if (enableDSM) {
-        if (ImGui::CollapsingHeader("Directional Shadow Mapping")) {
-            ImGui::SliderInt("Sample Radius", &sampleRadius, 2, 8, "%d");
-            ImGui::SliderFloat("Shadow Bias", &shadowBias, 0.005f, 0.05f, "%.3f");
-            ImGui::SliderFloat("Bias Variation", &biasVariation, 0.01f, 0.05f, "%.3f");
+        // Lighting - Directional Shadow Mapping
+        ImGui::SetNextItemOpen(true, ImGuiCond_Once);
+        if (ImGui::TreeNode("Directional Shadow Mapping")) {
+            ImGui::Checkbox("Enable DSM", &enableDSM);
+            if (enableDSM) {
+                ImGui::SliderInt("Sample Radius", &sampleRadius, 2, 8, "%d");
+                ImGui::SliderFloat("Shadow Bias", &shadowBias, 0.005f, 0.05f, "%.3f");
+                ImGui::SliderFloat("Bias Variation", &biasVariation, 0.01f, 0.05f, "%.3f");
+            }
+
+            ImGui::TreePop();
+        }
+
+        // Lighting - Point Light
+        ImGui::SetNextItemOpen(true, ImGuiCond_Once);
+        if (ImGui::TreeNode("Point/Area/Volume Lights")) {
+            ImGui::Checkbox("Point Light", &enablePL);
+            if (enablePL) {
+                ImGui::DragFloat3("Position", (float*)&pLightPos, 0.01f, -2.0f, 2.0f, "%.2f");
+            }
+
+            ImGui::TreePop();
         }
     }
 
-    ImGui::SeparatorText("Shading");
-    ImGui::Checkbox("Enable Normal Map", &useNormalMap);
+    // Shading
+    ImGui::SetNextItemOpen(true, ImGuiCond_Once);
+    if (ImGui::CollapsingHeader("Shading")) {
+        ImGui::Checkbox("Enable Normal Map", &useNormalMap);
+    }
 
     ImGui::End();
 }
@@ -636,7 +789,7 @@ static void imGuiInit(GLFWwindow* wd) {
     ImGui::StyleColorsDark();
     ImGuiStyle& style = ImGui::GetStyle();
     float rounded = 12.0f;
-    style.TabRounding = rounded;
+    style.TabRounding = rounded / 2;
     style.FrameRounding = rounded;
     style.GrabRounding = rounded;
     style.WindowRounding = rounded / 2;
@@ -730,17 +883,32 @@ int main(void) {
 
     // Shaders
     Shader modelSP("FP/shaders/model.vert", "FP/shaders/model.frag");
-    Shader celSP("FP/shaders/filter.vert", "FP/shaders/cel.frag");
+    Shader geometrySP("FP/shaders/geometry.vert", "FP/shaders/geometry.frag");
+    // Directional Shadow Mapping
     Shader dsmSP("FP/shaders/dsm.vert", "FP/shaders/dsm.frag");
+    // P, A, V Lights
+    Shader lightSP("FP/shaders/light.vert", "FP/shaders/light.frag");
+    // Point Light
+    Shader brightPassSP("FP/shaders/filter.vert", "FP/shaders/bright_pass.frag");
+    Shader gaussianSP("FP/shaders/filter.vert", "FP/shaders/gaussian_blur.frag");
+    Shader bloomSP("FP/shaders/filter.vert", "FP/shaders/bloom.frag");
+    // Cel
+    Shader celSP("FP/shaders/filter.vert", "FP/shaders/cel.frag");
+    // Output
     Shader finalSP("FP/shaders/filter.vert", "FP/shaders/final.frag");
 
     // Models
     Model room("FP/models/Grey White Room.obj");
     Model trice("FP/models/Trice.obj");
+    Model sphere("FP/models/Sphere.obj");
 
-    // FBOs
+    // GBO & FBOs
+    gbo.init();
     sceneFBO.init();
+    // Directional Shadow Mapping
     dsmFBO.init();
+    // P, A, V Lights
+    plFBO.init();
     celFBO.init();
 
 
@@ -762,22 +930,44 @@ int main(void) {
         camera.updatePosition();
         updateMVP();
 
-        // DSM
-        dsmFBO.bind();
-        dsmSP.activate();
-        renderSceneDSM(room, trice, dsmSP);
-        dsmFBO.unbind();
+//#pragma region NON_DEFFERED
+//        // DSM
+//        dsmFBO.bind();
+//        renderSceneDSM(room, trice, dsmSP);
+//        dsmFBO.unbind();
+//
+//        // Point Light
+//        if (enablePL) {
+//            plFBO.bind();
+//            renderLight(sphere, modelSP, LightType::LightType_Point);
+//            plFBO.unbind();
+//            // bloomFilter(brightPassSP, gaussianSP, bloomSP);
+//        }
+//
+//        // Render whole scene
+//        sceneFBO.bind();
+//        renderScene(room, trice, modelSP, dsmFBO.getTexture());
+//        sceneFBO.unbind();
+//
+//        currentTexture = sceneFBO.getTexture();
+//        
+//#pragma endregion
 
-        // Render whole scene
-        sceneFBO.bind();
-        modelSP.activate();
-        renderScene(room, trice, modelSP, dsmFBO.getTexture());
-        sceneFBO.unbind();
+#pragma region DEFFERED
+        gbo.bindWrite();
+        cout << "GBO_BIND: " << glGetError() << endl;
+        geometrySP.activate();
+        cout << "GSP_ON: " << glGetError() << endl;
+        renderScene(room, trice, geometrySP);
+        // renderModel(sphere, geometrySP, Mpl, Mv, Mp);
+        cout << "RENDER: " << glGetError() << endl;
+        gbo.unbind();
+        cout << "GBO_UNBIND: " << glGetError() << endl;
 
-        currentTexture = sceneFBO.getTexture();
+        currentTexture = gbo.getTexture(GBO_TEXTURE_TYPE_AMBIENT);
+#pragma endregion
 
         // Render final result to screen
-        // glBindFramebuffer(GL_FRAMEBUFFER, 0);
         finalSP.activate();
         finalSP.setInt("tex", 0);
         renderFullScreenQuad(currentTexture);
@@ -803,7 +993,7 @@ int main(void) {
         // ImGui
         if (showMenu) {
             renderGeneralMenu();
-            renderLightingMenu();
+            renderLightShadeMenu();
             renderImGuiFrame();
         }
 

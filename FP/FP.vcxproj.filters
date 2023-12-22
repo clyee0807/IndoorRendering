@@ -78,5 +78,10 @@
     <None Include="shaders\final.frag" />
     <None Include="shaders\dsm.frag" />
     <None Include="shaders\dsm.vert" />
+    <None Include="shaders\gaussian_blur.frag" />
+    <None Include="shaders\light.frag" />
+    <None Include="shaders\light.vert" />
+    <None Include="shaders\bright_pass.frag" />
+    <None Include="shaders\bloom.frag" />
   </ItemGroup>
 </Project>

@@ -17,7 +17,7 @@ out VS_OUT {
 
 out vec4 fragPosLightSpace;
 out vec3 normal;
-out vec2 texCoord;
+out vec2 texCoords;
 
 // MVP
 uniform mat4 MM;
@@ -28,6 +28,9 @@ uniform mat4 MP;
 uniform mat4 MDSM;
 uniform vec3 lightPos;
 
+
+
+/* ---------------------------- MAIN ---------------------------- */
 void main() {
     // Eye space to tangent space TBN
     vs_out.T  = mat3(MV * MM) * inTan;
@@ -42,6 +45,6 @@ void main() {
     vs_out.V  = - P.xyz;
 
     fragPosLightSpace = MDSM * vec4(inPos, 1.0);
-    texCoord = inTex;
+    texCoords = inTex;
     gl_Position = MP * P;
 }

@@ -296,8 +296,8 @@ static void renderModel(const Model& model, Shader& shader, GLuint shadowMap, co
     shader.setInt("useNM", useNormalMap);
     shader.setInt("enableBP", enableBP);
     shader.setInt("enableDSM", enableDSM);
+    shader.setInt("enableCEL", enableCel);
 
-    //shader.setInt("endbleCel", enableCel);
     
     model.render(shader);
 }
@@ -330,11 +330,6 @@ static void renderFullScreenQuad(GLuint texture) {
     glBindVertexArray(0);
     glEnable(GL_DEPTH_TEST);
 }
-
-void celShading() {
-    currentTexture = celFBO.getTexture();
-}
-
 
 
 /* --------------------------- IMGUI ---------------------------- */
@@ -736,7 +731,7 @@ int main(void) {
 
     // Shaders
     Shader modelSP("FP/shaders/model.vert", "FP/shaders/model.frag");
-    Shader celSP("FP/shaders/filter.vert", "FP/shaders/cel.frag");
+    Shader celSP("FP/shaders/model.vert", "FP/shaders/model.frag");
     Shader edgeSP("FP/shaders/filter.vert", "FP/shaders/edge.frag");
     Shader dsmSP("FP/shaders/dsm.vert", "FP/shaders/dsm.frag");
     Shader finalSP("FP/shaders/filter.vert", "FP/shaders/final.frag");
@@ -795,13 +790,12 @@ int main(void) {
         if (enableCel) {
             celFBO.bind();
             celSP.activate();
-            glUniform1i(glGetUniformLocation(celSP.getID(), "screenTex"), 0);
-            glUniform1i(glGetUniformLocation(celSP.getID(), "pixelSize"), 2);  // i don't know how much, but 2 looks great
-            renderFullScreenQuad(currentTexture);
+            renderScene(room, trice, celSP, dsmFBO.getTexture());
             celFBO.unbind();
 
-            currentTexture = celFBO.getTexture();
+            //currentTexture = celFBO.getTexture();
 
+            // Edge detection
             edgeFBO.bind();
             edgeSP.activate();
             glUniform1i(glGetUniformLocation(edgeSP.getID(), "screenTex"), 0);

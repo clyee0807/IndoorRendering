@@ -47,6 +47,7 @@ uniform sampler2D shadowMap;
 uniform bool useNM;
 uniform bool enableBP;
 uniform bool enableDSM;
+uniform bool enableCEL;
 
 
 
@@ -117,6 +118,18 @@ void main() {
     vec3 result = enableBP
         ? (blinnPhong.ambient + blinnPhong.diffuse * diffuseFactor + blinnPhong.specular)
         : Kd * diffuseFactor;
+
+    // Cel Shading
+     if (enableCEL) {
+        float intensity = dot(normalize(NL), normalize(L)); 
+        if (intensity > 0.66) {
+            result *= 1.25;  
+        } else if (intensity > 0.33) {
+            result *= 1.0;  
+        } else {
+            result *= 0.75;  
+        }
+    }
 
     if (textureColor.a < 0.5)
         discard;

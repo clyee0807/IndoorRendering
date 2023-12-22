@@ -3,6 +3,7 @@
 enum class FBOType {
     FBOType_Normal = 0,
     FBOType_Depth  = 1,
+    FBOType_Cel = 2,
 };
 
 class FBO {

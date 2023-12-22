@@ -78,5 +78,6 @@
     <None Include="shaders\final.frag" />
     <None Include="shaders\dsm.frag" />
     <None Include="shaders\dsm.vert" />
+    <None Include="shaders\edge.frag" />
   </ItemGroup>
 </Project>

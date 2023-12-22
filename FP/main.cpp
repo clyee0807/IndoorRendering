@@ -86,6 +86,9 @@ bool enableDSM = true;
 // Cel Shading
 FBO celFBO(windowWidth, windowHeight, FBOType::FBOType_Normal);
 bool enableCel = false;
+// Edge detection
+FBO edgeFBO(windowWidth, windowHeight, FBOType::FBOType_Normal);
+
 
 
 
@@ -734,6 +737,7 @@ int main(void) {
     // Shaders
     Shader modelSP("FP/shaders/model.vert", "FP/shaders/model.frag");
     Shader celSP("FP/shaders/filter.vert", "FP/shaders/cel.frag");
+    Shader edgeSP("FP/shaders/filter.vert", "FP/shaders/edge.frag");
     Shader dsmSP("FP/shaders/dsm.vert", "FP/shaders/dsm.frag");
     Shader finalSP("FP/shaders/filter.vert", "FP/shaders/final.frag");
 
@@ -746,8 +750,10 @@ int main(void) {
     sceneFBO.init();
     dsmFBO.init();
     celFBO.init();
+    edgeFBO.init();
     cout << "celFBO.getTexture(): " << celFBO.getTexture() << "\n";
     cout << "dsmFBO.getTexture(): " << dsmFBO.getTexture() << "\n";
+    cout << "edgeFBO.getTexture(): " << edgeFBO.getTexture() << "\n";
 
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
         cout << "ERROR::FRAMEBUFFER:: Framebuffer is not complete!" << endl;
@@ -790,11 +796,19 @@ int main(void) {
             celFBO.bind();
             celSP.activate();
             glUniform1i(glGetUniformLocation(celSP.getID(), "screenTex"), 0);
-            glUniform1i(glGetUniformLocation(celSP.getID(), "pixelSize"), 4);
+            glUniform1i(glGetUniformLocation(celSP.getID(), "pixelSize"), 2);  // i don't know how much, but 2 looks great
             renderFullScreenQuad(currentTexture);
             celFBO.unbind();
 
             currentTexture = celFBO.getTexture();
+
+            edgeFBO.bind();
+            edgeSP.activate();
+            glUniform1i(glGetUniformLocation(edgeSP.getID(), "screenTex"), 0);
+            renderFullScreenQuad(currentTexture); 
+            edgeFBO.unbind();
+
+            currentTexture = edgeFBO.getTexture();
         }
 
         // Render final result to screen

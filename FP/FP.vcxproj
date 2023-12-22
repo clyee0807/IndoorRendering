@@ -164,6 +164,7 @@
     <None Include="shaders\cel.frag" />
     <None Include="shaders\dsm.frag" />
     <None Include="shaders\dsm.vert" />
+    <None Include="shaders\edge.frag" />
     <None Include="shaders\filter.vert" />
     <None Include="shaders\final.frag" />
     <None Include="shaders\model.frag" />

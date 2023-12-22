@@ -77,6 +77,7 @@ class FBO {
             // Unbind the framebuffer
             glBindTexture(GL_TEXTURE_2D, 0);
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            std::cout << "In init(), FBO.texture = " << texture << "\n";
         }
 
         void resize(int newWidth, int newHeight) {

@@ -293,6 +293,8 @@ static void renderModel(const Model& model, Shader& shader, GLuint shadowMap, co
     shader.setInt("useNM", useNormalMap);
     shader.setInt("enableBP", enableBP);
     shader.setInt("enableDSM", enableDSM);
+
+    //shader.setInt("endbleCel", enableCel);
     
     model.render(shader);
 }
@@ -481,6 +483,7 @@ static void renderLightingMenu() {
 
     ImGui::SeparatorText("Shading");
     ImGui::Checkbox("Enable Normal Map", &useNormalMap);
+    ImGui::Checkbox("Enable Cel Shading", &enableCel);
 
     ImGui::End();
 }
@@ -734,6 +737,7 @@ int main(void) {
     Shader dsmSP("FP/shaders/dsm.vert", "FP/shaders/dsm.frag");
     Shader finalSP("FP/shaders/filter.vert", "FP/shaders/final.frag");
 
+ 
     // Models
     Model room("FP/models/Grey White Room.obj");
     Model trice("FP/models/Trice.obj");
@@ -742,6 +746,13 @@ int main(void) {
     sceneFBO.init();
     dsmFBO.init();
     celFBO.init();
+    cout << "celFBO.getTexture(): " << celFBO.getTexture() << "\n";
+    cout << "dsmFBO.getTexture(): " << dsmFBO.getTexture() << "\n";
+
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+        cout << "ERROR::FRAMEBUFFER:: Framebuffer is not complete!" << endl;
+    }
+
 
 
 
@@ -773,8 +784,18 @@ int main(void) {
         modelSP.activate();
         renderScene(room, trice, modelSP, dsmFBO.getTexture());
         sceneFBO.unbind();
-
         currentTexture = sceneFBO.getTexture();
+
+        if (enableCel) {
+            celFBO.bind();
+            celSP.activate();
+            glUniform1i(glGetUniformLocation(celSP.getID(), "screenTex"), 0);
+            glUniform1i(glGetUniformLocation(celSP.getID(), "pixelSize"), 4);
+            renderFullScreenQuad(currentTexture);
+            celFBO.unbind();
+
+            currentTexture = celFBO.getTexture();
+        }
 
         // Render final result to screen
         // glBindFramebuffer(GL_FRAMEBUFFER, 0);

@@ -8,7 +8,6 @@ layout(location = 4) in vec3 inBitan;
 
 out VS_OUT {
     vec3 fragPos;
-    // out vec3 fragNormal;
     vec2 texCoords;
     mat3 TBN;
 } vs_out;
@@ -32,6 +31,5 @@ void main() {
 
     gl_Position = MP * MV * worldPos;
     vs_out.fragPos = worldPos.xyz;
-    // fragNormal = N;
     vs_out.texCoords = inTex;
 }

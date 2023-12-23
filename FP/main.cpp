@@ -5,6 +5,7 @@
 #include <ctime>
 
 // #define VSYNC_DISABLED
+#define DEFERRED_SHADING
 #include <imgui/imgui.h>
 #include <imgui/imgui_impl_glfw.h>
 #include <imgui/imgui_impl_opengl3.h>
@@ -82,8 +83,6 @@ const vec3 DSM_TARGET(0.542, -0.141, -0.422);
 const float DSM_RANGE = 5.0f, DSM_NEAR = 0.1f, DSM_FAR = 10.0f;
 mat4 MDSMp = ortho(DSM_RANGE / -2, DSM_RANGE / 2, DSM_RANGE / -2, DSM_RANGE / 2, DSM_NEAR, DSM_FAR);
 mat4 MDSMv(1.0f), MDSM(1.0f);
-int sampleRadius = 4;
-float shadowBias = 0.025f, biasVariation = 0.03f;
 // P, A, V Lights
 enum class LightType {
     LightType_Point = 0,
@@ -115,6 +114,8 @@ bool enableBP = true;
 // Directional Shadow Mapping
 FBO dsmFBO(1024, 1024, FBOType::FBOType_Depth);
 bool enableDSM = true;
+int sampleRadius = 6;
+float shadowBias = 0.025f, biasVariation = 0.03f;
 // Point Light (Shadow)
 FBO plFBO(windowWidth, windowHeight, FBOType::FBOType_2D);
 FBO plsFBO(1024, 1024, FBOType::FBOType_Depth);
@@ -338,38 +339,18 @@ static void updateMVP() {
     MDSMv = lookAt(lightPos, DSM_TARGET, UP_VEC);
     MDSM = MDSMp * MDSMv;
 }
+
 static void updateObjectPosition() {
     if (isMoving) {
         objectPos += moveVec * moveStep;
     }
 }
 
-// =====================================================================================
 static void renderModel(const Model& model, Shader& shader, const mat4& mMat, const mat4& vMat, const mat4& pMat) {
     // MVP
-    shader.setMat4("MM", mMat);
-    shader.setMat4("MV", vMat);
-    shader.setMat4("MP", pMat);
-
-    // Options
-    shader.setInt("useNM", useNormalMap);
-
-    model.render(shader);
-}
-
-static void renderScene(const Model& MODEL_ROOM, const Model& MODEL_TRICE, Shader& shader) {
-    shader.activate();
-    
-    renderModel(MODEL_ROOM, shader, mat4(1.0f), Mv, Mp);
-    renderModel(MODEL_TRICE, shader, Mtrice, Mv, Mp);
-}
-// =====================================================================================
-
-static void renderModel(const Model& model, Shader& shader, GLuint shadowMap, const mat4& mMat, const mat4& vMat, const mat4& pMat) {
-    // MVP
-    shader.setMat4("MM", mMat);
-    shader.setMat4("MV", vMat);
-    shader.setMat4("MP", pMat);
+    shader.setMat4("MM", mMat);  // Common
+    shader.setMat4("MV", vMat);  // Common
+    shader.setMat4("MP", pMat);  // Common
 
     // Lighting
     shader.setMat4("MDSM", MDSM);
@@ -380,7 +361,7 @@ static void renderModel(const Model& model, Shader& shader, GLuint shadowMap, co
     shader.setFloat("biasVariation", biasVariation);
 
     // Options
-    shader.setInt("useNM", useNormalMap);
+    shader.setInt("useNM", useNormalMap);  // Common
     shader.setInt("enableBP", enableBP);
     shader.setInt("enableDSM", enableDSM);
     shader.setInt("enableNPR", enableNPR);
@@ -390,20 +371,10 @@ static void renderModel(const Model& model, Shader& shader, GLuint shadowMap, co
 
 static void renderScene(const Model& MODEL_ROOM, const Model& MODEL_TRICE, Shader& shader, GLuint shadowMap) {
     shader.activate();
-    shader.setTexture("shadowMap", shadowMap, 2);
+    shader.setTexture("shadowMap", shadowMap, 6);  // For modelSP
 
-    renderModel(MODEL_ROOM, shader, shadowMap, mat4(1.0f), Mv, Mp);
-    renderModel(MODEL_TRICE, shader, shadowMap, Mtrice, Mv, Mp);
-}
-
-static void renderSceneDSM(const Model& MODEL_ROOM, const Model& MODEL_TRICE, Shader& shader) {
-    shader.activate();
-
-    shader.setMat4("MDSM", MDSM);
-    MODEL_ROOM.render(shader);
-
-    shader.setMat4("MDSM", MDSM * Mtrice);
-    MODEL_TRICE.render(shader);
+    renderModel(MODEL_ROOM, shader, mat4(1.0f), Mv, Mp);
+    renderModel(MODEL_TRICE, shader, Mtrice, Mv, Mp);
 }
 
 static void renderLight(const Model& MODEL_LIGHT, Shader& shader, LightType type) {
@@ -430,7 +401,52 @@ static void renderFullScreenQuad(GLuint texture) {
     glBindVertexArray(0);
 }
 
-static void bloomFilter(Shader& brightPassShader, Shader& gaussianShader, Shader& bloomShader) {
+static void renderFullScreenQuad() {
+    glBindVertexArray(rectVAO);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+    glBindVertexArray(0);
+}
+
+
+
+/* --------------------------- FILTER --------------------------- */
+static GLuint lightPass(GBO& sourceGBO, FBO& targetFBO, Shader& shader, GLuint shadowMap) {
+    // Lighting Pass
+    targetFBO.bind();
+    shader.activate();
+    shader.setTexture("gPosition", sourceGBO.getTexture(GBO_TEXTURE_TYPE_VERTEX), 0);
+    shader.setTexture("gNormal", sourceGBO.getTexture(GBO_TEXTURE_TYPE_NORMAL), 1);
+    shader.setTexture("gDiffuse", sourceGBO.getTexture(GBO_TEXTURE_TYPE_DIFFUSE), 2);
+    shader.setTexture("gAmbient", sourceGBO.getTexture(GBO_TEXTURE_TYPE_AMBIENT), 3);
+    shader.setTexture("gSpecular", sourceGBO.getTexture(GBO_TEXTURE_TYPE_SPECULAR), 4);
+    shader.setTexture("shadowMap", shadowMap, 6);
+
+    // MVP
+    shader.setMat4("MV", Mv);
+    shader.setMat4("MP", Mp);
+
+    // Lighting
+    shader.setMat4("MDSM", MDSM);
+    shader.setVec3("lightPos", lightPos);
+
+    // Directional Shadow Mapping
+    shader.setInt("sampleRadius", sampleRadius);
+    shader.setFloat("shadowBias", shadowBias);
+    shader.setFloat("biasVariation", biasVariation);
+
+    // Options
+    shader.setInt("enableBP", enableBP);
+    shader.setInt("enableDSM", enableDSM);
+    shader.setInt("enableNPR", enableNPR);
+
+    renderFullScreenQuad();
+    targetFBO.unbind();
+
+    return targetFBO.getTexture();
+}
+
+static GLuint bloomFilter(Shader& brightPassShader, Shader& gaussianShader, Shader& bloomShader) {
     // Bright pass + Gaussian blur
     //brightPassFBO.bind();
     //brightPassShader.activate();
@@ -469,18 +485,26 @@ static void bloomFilter(Shader& brightPassShader, Shader& gaussianShader, Shader
     //currentTexture = bloomFBO.getTexture();
 }
 
-static void npr(Shader& nprShader) {
+static GLuint npr(FBO& edgeFBO, Shader& nprShader, GLuint sourceTex) {
+    // Cel is written in light pass shader,
+    // due the need of N and L vectors.
     edgeFBO.bind();
     nprShader.activate();
     nprShader.setInt("currentTex", 0);
     nprShader.setFloat("threshold", edgeThreshold);
-    renderFullScreenQuad(currentTexture);
+    renderFullScreenQuad(sourceTex);
     edgeFBO.unbind();
 
-    currentTexture = edgeFBO.getTexture();
+    return edgeFBO.getTexture();
 }
 
-static void fxaaSetParams(Shader& fxaaShader, int level) {
+static GLuint fxaa(FBO& fxaaFBO, Shader& fxaaShader, GLuint sourceTex) {
+    int level = stoi(fxaaLevel);
+
+    fxaaFBO.bind();
+    fxaaShader.activate();
+    fxaaShader.setInt("currentTex", 0);
+    fxaaShader.setVec2("texSize", vec2(windowWidth, windowHeight));
     switch (level) {
         case 3:
             fxaaShader.setFloat("FXAA_EDGE_THRESHOLD_MIN", (1.0 / 16.0));
@@ -494,19 +518,11 @@ static void fxaaSetParams(Shader& fxaaShader, int level) {
             fxaaShader.setFloat("FXAA_EDGE_THRESHOLD_MIN", (1.0 / 24.0));
             fxaaShader.setInt("FXAA_SEARCH_STEPS", 32);
             break;
-        }
-}
-
-static void fxaa(Shader& celShader, Shader& fxaaShader) {
-    fxaaFBO.bind();
-    fxaaShader.activate();
-    fxaaShader.setInt("currentTex", 0);
-    fxaaShader.setVec2("texSize", vec2(windowWidth, windowHeight));
-    fxaaSetParams(fxaaShader, stoi(fxaaLevel));
-    renderFullScreenQuad(currentTexture);
+    }
+    renderFullScreenQuad(sourceTex);
     fxaaFBO.unbind();
 
-    currentTexture = fxaaFBO.getTexture();
+    return fxaaFBO.getTexture();
 }
 
 
@@ -1021,19 +1037,16 @@ int main(void) {
 
     // Shaders
     Shader modelSP("FP/shaders/model.vert", "FP/shaders/model.frag");
-    Shader geometrySP("FP/shaders/geometry.vert", "FP/shaders/geometry.frag");
     // Directional Shadow Mapping
     Shader dsmSP("FP/shaders/dsm.vert", "FP/shaders/dsm.frag");
-    // P, A, V Lights
-    Shader lightSP("FP/shaders/light.vert", "FP/shaders/light.frag");
+    // Deferred Shading
+    Shader geometrySP("FP/shaders/geometry.vert", "FP/shaders/geometry.frag");
+    Shader lightingSP("FP/shaders/filter.vert", "FP/shaders/light.frag");
     // Point Light
     Shader brightPassSP("FP/shaders/filter.vert", "FP/shaders/bright_pass.frag");
     Shader gaussianSP("FP/shaders/filter.vert", "FP/shaders/gaussian_blur.frag");
     Shader bloomSP("FP/shaders/filter.vert", "FP/shaders/bloom.frag");
-
-    // Shading
     // NPR
-    Shader celSP("FP/shaders/filter.vert", "FP/shaders/cel.frag");
     Shader edgeSP("FP/shaders/filter.vert", "FP/shaders/edge_detection.frag");
     // FXAA
     Shader fxaaSP("FP/shaders/filter.vert", "FP/shaders/fxaa.frag");
@@ -1077,51 +1090,55 @@ int main(void) {
         camera.updatePosition();
         updateMVP();
 
-//#pragma region NON_DEFFERED
-//        // DSM
-//        dsmFBO.bind();
-//        renderSceneDSM(room, trice, dsmSP);
-//        dsmFBO.unbind();
-//
-//        // Point Light
-//        if (enablePL) {
-//            plFBO.bind();
-//            renderLight(sphere, modelSP, LightType::LightType_Point);
-//            plFBO.unbind();
-//            // bloomFilter(brightPassSP, gaussianSP, bloomSP);
-//        }
-//
-//        // Render whole scene
-//        sceneFBO.bind();
-//        renderScene(room, trice, modelSP, dsmFBO.getTexture());
-//        sceneFBO.unbind();
-//
-//        currentTexture = sceneFBO.getTexture();
-//        
-//#pragma endregion
+        // DSM
+        {
+            dsmFBO.bind();
+            dsmSP.activate();
+            dsmSP.setMat4("MDSM", MDSM);
+            room.render(dsmSP);
+            dsmSP.setMat4("MDSM", MDSM * Mtrice);
+            trice.render(dsmSP);
+            dsmFBO.unbind();
+        }
 
-#pragma region DEFFERED
+#ifndef DEFERRED_SHADING
+        // Point Light
+        if (enablePL) {
+            plFBO.bind();
+            renderLight(sphere, modelSP, LightType::LightType_Point);
+            plFBO.unbind();
+        }
+
+        // Render scene
+        sceneFBO.bind();
+        renderScene(room, trice, modelSP, dsmFBO.getTexture());
+        sceneFBO.unbind();
+
+        currentTexture = sceneFBO.getTexture();
+#endif
+
+#ifdef DEFERRED_SHADING
         // ...And another thing — do NOT forget to disable GL_BLEND.  — anossovp, 8 years ago
         // If I were find this comment a week ago, that would save a LOT of debugging  — Sandor Muranyi, 6 years ago
-        // https://learnopengl.com/Lighting/Multiple-lights
+        // https://learnopengl.com/Advanced-Lighting/Deferred-Shading
         glDisable(GL_BLEND);
 
+        // Geometry Pass
         gbo.bindWrite();
-        geometrySP.activate();
-        renderScene(room, trice, geometrySP);
+        renderScene(room, trice, geometrySP, dsmFBO.getTexture());
         gbo.unbind();
-        // glEnable(GL_BLEND);
-
-        currentTexture = gbo.getTexture(GBO_TEXTURE_TYPE_VERTEX);
-#pragma endregion
+        
+        // Lighting Pass
+        currentTexture = lightPass(gbo, sceneFBO, lightingSP, dsmFBO.getTexture());
+#endif
 
         // FXAA, NPR
         if (enableNPR)
-            npr(edgeSP);
+            currentTexture = npr(edgeFBO, edgeSP, currentTexture);
         if (enableFXAA)
-            fxaa(celSP, fxaaSP);
+            currentTexture = fxaa(fxaaFBO, fxaaSP, currentTexture);
 
-        // Render final result to screen
+        // Final result
         finalSP.activate();
         finalSP.setInt("currentTex", 0);
         renderFullScreenQuad(currentTexture);

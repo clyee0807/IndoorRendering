@@ -18,6 +18,7 @@ out VS_OUT {
 out vec4 fragPosLightSpace;
 out vec3 normal;
 out vec2 texCoords;
+out mat3 MMV;
 
 // MVP
 uniform mat4 MM;
@@ -38,11 +39,12 @@ void main() {
     vs_out.N_N = inNormal;
 
     // N, L, V
+    MMV = mat3(MV * MM);
     vec4 lightPosView = MV * vec4(lightPos, 1.0);
-    vec4 P    = MV * MM * vec4(inPos, 1.0);
-    vs_out.N_L = mat3(MV * MM) * inNormal;
-    vs_out.L  = lightPosView.xyz - P.xyz;
-    vs_out.V  = - P.xyz;
+    vec4 P     = MV * MM * vec4(inPos, 1.0);
+    vs_out.N_L = MMV * inNormal;
+    vs_out.L   = lightPosView.xyz - P.xyz;
+    vs_out.V   = - P.xyz;
 
     fragPosLightSpace = MDSM * vec4(inPos, 1.0);
     texCoords = inTex;

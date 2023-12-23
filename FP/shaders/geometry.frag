@@ -8,7 +8,6 @@ layout(location = 4) out vec3 outSpecular;
 
 in VS_OUT {
     vec3 fragPos;
-    // out vec3 fragNormal;
     vec2 texCoords;
     mat3 TBN;
 } fs_in;
@@ -37,10 +36,13 @@ void main() {
     vec3 normalMap = texture(normalMap, fs_in.texCoords).rgb;
     normalMap = normalMap * 2.0 - 1.0;
 
-    outPos = fs_in.fragPos;
-    outNormal = (hasNM && useNM) ? normalize(fs_in.TBN * normalMap) : fs_in.TBN[2];
-    outDiffuse = hasTex ? texColor.rgb : material.Kd.rgb;
-    // outAmbient = material.Ka.rgb;
-    outAmbient = material.Kd.rgb;
-    outSpecular = material.Ks.rgb;
+    if (texColor.a < 0.5)
+        discard;
+    else {
+        outPos = fs_in.fragPos;
+        outNormal = (hasNM && useNM) ? normalize(fs_in.TBN * normalMap) : fs_in.TBN[2];
+        outDiffuse = hasTex ? texColor.rgb : material.Kd.rgb;
+        outAmbient = material.Ka.rgb;
+        outSpecular = material.Ks.rgb;
+    }
 }

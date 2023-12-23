@@ -13,6 +13,7 @@ in VS_OUT {
 
 in vec4 fragPosLightSpace;
 in vec2 texCoords;
+in mat3 MMV;
 
 // Shading
 uniform bool hasTex;
@@ -101,7 +102,7 @@ void main() {
     mat3 TBN = mat3(T, B, NN);
 
     // Lighting Vectors
-    vec3 NL = (hasNM && useNM) ? normalize(TBN * normalMap) : normalize(fs_in.N_L);
+    vec3 NL = (hasNM && useNM) ? normalize(MMV * TBN * normalMap) : normalize(fs_in.N_L);
     vec3 L  = normalize(fs_in.L);
     vec3 V  = normalize(fs_in.V);
 

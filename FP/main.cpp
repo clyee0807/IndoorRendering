@@ -46,6 +46,7 @@ bool captureScreen = false;
 
 // Object
 GBO gbo(windowWidth, windowHeight);
+int displayType = 5;
 // Please ensure applying the matrices in STR order (R * T * S), or else you'd think
 // you're bad at OpenGL, because the trice won't fuckin MOVE
 // Focus
@@ -60,12 +61,6 @@ float triceScale = 0.001f;
 mat4 MtriceS = scale(mat4(1.0f), vec3(triceScale));
 mat4 MtriceT = translate(mat4(1.0f), tricePos);
 mat4 Mtrice = MtriceT * MtriceS;
-// Point Light (sphere)
-vec3 pLightPos(1.87659, 0.4625, 0.103928);
-float pLightScale = 0.22f;
-mat4 MplS = scale(mat4(1.0f), vec3(pLightScale));
-mat4 MplT(1.0f);
-mat4 Mpl(1.0f);
 
 // Camera
 float fov = radians(60.0f);
@@ -90,6 +85,7 @@ enum class LightType {
     LightType_Volume = 2,
 };
 struct PointLight {
+    vec3 position;
     float constant;
     float linear;
     float quadratic;
@@ -100,10 +96,21 @@ struct AreaLight {
 struct VolumeLight {
     vec3 position;
 };
-// Point Light (Shadow)
-const float PLS_RANGE = 5.0f, PLS_NEAR = 0.22f, PLS_FAR = 10.0f;
-mat4 MPLSp = ortho(PLS_RANGE / -2, PLS_RANGE / 2, PLS_RANGE / -2, PLS_RANGE / 2, PLS_NEAR, PLS_FAR);
-mat4 MPLSv(1.0f), MPLS(1.0f);
+// Point Light
+PointLight pointLight = {
+    vec3(1.87659, 0.4625, 0.103928), 1.0, 0.7, 0.14
+};
+float pLightScale = 0.22f;
+mat4 MplS = scale(mat4(1.0f), vec3(pLightScale));
+mat4 MplT(1.0f);
+mat4 Mpl(1.0f);
+bool enablePL = true;
+// Point Light Shadow
+const float PLS_NEAR = 0.22f, PLS_FAR = 10.0f;
+mat4 MPLSp = perspective(radians(90.0f), (float)(1024 / 1024), PLS_NEAR, PLS_FAR);
+vector<mat4> MPLS;
+// Area Light
+// Volume Light
 
 // Shaders
 GLuint rectVAO, rectVBO, currentTexture;
@@ -115,11 +122,10 @@ bool enableBP = true;
 FBO dsmFBO(1024, 1024, FBOType::FBOType_Depth);
 bool enableDSM = true;
 int sampleRadius = 6;
-float shadowBias = 0.025f, biasVariation = 0.03f;
-// Point Light (Shadow)
+float shadowBias = 0.002f, biasVariation = 0.01f;
+// Point Light Shadow
 FBO plFBO(windowWidth, windowHeight, FBOType::FBOType_2D);
-FBO plsFBO(1024, 1024, FBOType::FBOType_Depth);
-bool enablePL = true;
+FBO plsFBO(1024, 1024, FBOType::FBOType_DepthCube);
 // Bloom
 FBO brightPassFBO(windowWidth, windowHeight, FBOType::FBOType_2D);
 FBO gaussianHFBO(windowWidth, windowHeight, FBOType::FBOType_2D);
@@ -332,12 +338,21 @@ static void updateMVP() {
     Mvp = Mp * Mv;
 
     // Point Light (sphere)
-    MplT = translate(mat4(1.0f), pLightPos);
+    MplT = translate(mat4(1.0f), pointLight.position);
     Mpl = MplT * MplS;
 
     // Lighting
+    // Directional Shadow Mapping
     MDSMv = lookAt(lightPos, DSM_TARGET, UP_VEC);
     MDSM = MDSMp * MDSMv;
+
+    // Point Light Shadow
+    MPLS.push_back(MPLSp * lookAt(pointLight.position, pointLight.position + vec3( 1.0, 0.0, 0.0), vec3(0.0,-1.0, 0.0)));
+    MPLS.push_back(MPLSp * lookAt(pointLight.position, pointLight.position + vec3(-1.0, 0.0, 0.0), vec3(0.0,-1.0, 0.0)));
+    MPLS.push_back(MPLSp * lookAt(pointLight.position, pointLight.position + vec3( 0.0, 1.0, 0.0), vec3(0.0, 0.0, 1.0)));
+    MPLS.push_back(MPLSp * lookAt(pointLight.position, pointLight.position + vec3( 0.0,-1.0, 0.0), vec3(0.0, 0.0,-1.0)));
+    MPLS.push_back(MPLSp * lookAt(pointLight.position, pointLight.position + vec3( 0.0, 0.0, 1.0), vec3(0.0,-1.0, 0.0)));
+    MPLS.push_back(MPLSp * lookAt(pointLight.position, pointLight.position + vec3( 0.0, 0.0,-1.0), vec3(0.0,-1.0, 0.0)));
 }
 
 static void updateObjectPosition() {
@@ -411,7 +426,7 @@ static void renderFullScreenQuad() {
 
 
 /* --------------------------- FILTER --------------------------- */
-static GLuint lightPass(GBO& sourceGBO, FBO& targetFBO, Shader& shader, GLuint shadowMap) {
+static GLuint lightPass(GBO& sourceGBO, FBO& targetFBO, Shader& shader, GLuint dShadowMap, GLuint plShadowMap) {
     // Lighting Pass
     targetFBO.bind();
     shader.activate();
@@ -420,7 +435,8 @@ static GLuint lightPass(GBO& sourceGBO, FBO& targetFBO, Shader& shader, GLuint s
     shader.setTexture("gDiffuse", sourceGBO.getTexture(GBO_TEXTURE_TYPE_DIFFUSE), 2);
     shader.setTexture("gAmbient", sourceGBO.getTexture(GBO_TEXTURE_TYPE_AMBIENT), 3);
     shader.setTexture("gSpecular", sourceGBO.getTexture(GBO_TEXTURE_TYPE_SPECULAR), 4);
-    shader.setTexture("shadowMap", shadowMap, 6);
+    shader.setTexture("shadowMap", dShadowMap, 6);
+    shader.setTexture("plShadowMap", plShadowMap, 7);
 
     // MVP
     shader.setMat4("MV", Mv);
@@ -435,10 +451,18 @@ static GLuint lightPass(GBO& sourceGBO, FBO& targetFBO, Shader& shader, GLuint s
     shader.setFloat("shadowBias", shadowBias);
     shader.setFloat("biasVariation", biasVariation);
 
+    // Lights
+    shader.setVec3("pointLight.position", pointLight.position);
+    shader.setFloat("pointLight.constant", pointLight.constant);
+    shader.setFloat("pointLight.linear", pointLight.linear);
+    shader.setFloat("pointLight.quadratic", pointLight.quadratic);
+
     // Options
+    shader.setInt("displayType", displayType);
     shader.setInt("enableBP", enableBP);
     shader.setInt("enableDSM", enableDSM);
     shader.setInt("enableNPR", enableNPR);
+    shader.setInt("enablePL", enablePL);
 
     renderFullScreenQuad();
     targetFBO.unbind();
@@ -695,7 +719,7 @@ static void renderLightShadeMenu() {
             ImGui::Checkbox("Enable DSM", &enableDSM);
             if (enableDSM) {
                 ImGui::SliderInt("Sample Radius", &sampleRadius, 2, 8, "%d");
-                ImGui::SliderFloat("Shadow Bias", &shadowBias, 0.005f, 0.05f, "%.3f");
+                ImGui::SliderFloat("Shadow Bias", &shadowBias, 0.001f, 0.02f, "%.3f");
                 ImGui::SliderFloat("Bias Variation", &biasVariation, 0.01f, 0.05f, "%.3f");
             }
 
@@ -707,7 +731,7 @@ static void renderLightShadeMenu() {
         if (ImGui::TreeNode("Point/Area/Volume Lights")) {
             ImGui::Checkbox("Point Light", &enablePL);
             if (enablePL) {
-                ImGui::DragFloat3("Position", (float*)&pLightPos, 0.01f, -2.0f, 2.0f, "%.2f");
+                ImGui::DragFloat3("Position", (float*)&pointLight.position, 0.01f, -2.0f, 2.0f, "%.2f");
             }
 
             ImGui::TreePop();
@@ -719,6 +743,25 @@ static void renderLightShadeMenu() {
     if (ImGui::CollapsingHeader("Shading")) {
         // Shading - Normal Mapping
         ImGui::Checkbox("Enable Normal Map", &useNormalMap);
+
+        // Shading - Deferred Shading
+        if (ImGui::BeginCombo("G-buffer Texture", GBOTextureDisplayTypes[displayType])) {
+            for (int i = 0; i < IM_ARRAYSIZE(GBOTextureDisplayTypes); i++) {
+                const bool isSelected = (i == displayType);
+                if (ImGui::Selectable(GBOTextureDisplayTypes[i], isSelected))
+                    displayType = i;
+                if (isSelected)
+                    ImGui::SetItemDefaultFocus();
+            }
+
+            ImGui::EndCombo();
+        }
+        ImGui::SameLine(); ImGui::TextDisabled("(?)");
+        if (ImGui::IsItemHovered()) {
+            ImGui::BeginTooltip();
+            ImGui::Text("Options other than \"Result\" will skip every post-processing.");
+            ImGui::EndTooltip();
+        }
 
         // Shading - NPR
         ImGui::SetNextItemOpen(true, ImGuiCond_Once);
@@ -1046,6 +1089,8 @@ int main(void) {
     Shader brightPassSP("FP/shaders/filter.vert", "FP/shaders/bright_pass.frag");
     Shader gaussianSP("FP/shaders/filter.vert", "FP/shaders/gaussian_blur.frag");
     Shader bloomSP("FP/shaders/filter.vert", "FP/shaders/bloom.frag");
+    // Point Light Shadow
+    Shader plsSP("FP/shaders/pls.vert", "FP/shaders/pls.geom", "FP/shaders/pls.frag");
     // NPR
     Shader edgeSP("FP/shaders/filter.vert", "FP/shaders/edge_detection.frag");
     // FXAA
@@ -1065,6 +1110,7 @@ int main(void) {
     dsmFBO.init();
     // P, A, V Lights
     plFBO.init();
+    plsFBO.init();
     // NPR
     edgeFBO.init();
     // FXAA
@@ -1090,16 +1136,38 @@ int main(void) {
         camera.updatePosition();
         updateMVP();
 
+        // Shadow map size
+        glViewport(0, 0, 1024, 1024);
+
         // DSM
         {
             dsmFBO.bind();
             dsmSP.activate();
-            dsmSP.setMat4("MDSM", MDSM);
+            dsmSP.setMat4("MshadowMap", MDSM);
             room.render(dsmSP);
-            dsmSP.setMat4("MDSM", MDSM * Mtrice);
+            dsmSP.setMat4("MshadowMap", MDSM * Mtrice);
             trice.render(dsmSP);
             dsmFBO.unbind();
         }
+
+        // PLS
+        {
+            plsFBO.bind();
+            plsSP.activate();
+            plsSP.setMat4("MM", mat4(1.0f));
+            plsSP.setMat4Array("MPLS", MPLS);
+            plsSP.setVec3("lightPos", pointLight.position);
+            plsSP.setFloat("farPlane", PLS_FAR);
+            room.render(plsSP);
+            plsSP.setMat4("MM", Mtrice);
+            plsSP.setMat4Array("MPLS", MPLS);
+            plsSP.setVec3("lightPos", pointLight.position);
+            plsSP.setFloat("farPlane", PLS_FAR);
+            trice.render(plsSP);
+            plsFBO.unbind();
+        }
+
+        glViewport(0, 0, windowWidth, windowHeight);
 
 #ifndef DEFERRED_SHADING
         // Point Light
@@ -1129,19 +1197,31 @@ int main(void) {
         gbo.unbind();
         
         // Lighting Pass
-        currentTexture = lightPass(gbo, sceneFBO, lightingSP, dsmFBO.getTexture());
+        currentTexture = lightPass(gbo, sceneFBO, lightingSP, dsmFBO.getTexture(), plsFBO.getTexture());
+
+        // Light Source Rendering
+        /*gbo.bindRead();
+        plFBO.bind();
+        glBlitFramebuffer(0, 0, gbo.getWidth(), gbo.getHeight(),
+                          0, 0, gbo.getWidth(), gbo.getHeight(),
+                          GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+        renderLight(sphere, modelSP, LightType::LightType_Point);
+        plFBO.unbind();*/
 #endif
 
         // FXAA, NPR
-        if (enableNPR)
-            currentTexture = npr(edgeFBO, edgeSP, currentTexture);
-        if (enableFXAA)
-            currentTexture = fxaa(fxaaFBO, fxaaSP, currentTexture);
+        if (displayType == 5) {
+            if (enableNPR)
+                currentTexture = npr(edgeFBO, edgeSP, currentTexture);
+            if (enableFXAA)
+                currentTexture = fxaa(fxaaFBO, fxaaSP, currentTexture);
+        }
 
         // Final result
         finalSP.activate();
         finalSP.setInt("currentTex", 0);
         renderFullScreenQuad(currentTexture);
+        // renderFullScreenQuad(plFBO.getTexture());
         
 
 

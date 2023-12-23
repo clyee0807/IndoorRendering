@@ -20,13 +20,17 @@ uniform sampler2D gAmbient;
 uniform sampler2D gSpecular;
 
 // Options
+uniform int displayType;
 uniform bool enableBP;
 uniform bool enableDSM;
 uniform bool enableNPR;
 
+uniform bool enablePL;
+uniform bool enableAreaLight;
+uniform bool enableVolumeLight;
 
 
-/* -------------------------- LIGHTING -------------------------- */
+
 // Blinn-Phong
 struct LightingComponents {
     vec3 ambient;
@@ -43,9 +47,10 @@ uniform float shadowBias;
 uniform float biasVariation;
 uniform sampler2D shadowMap;
 
-uniform int lightType;
 
+// P, A, V Lights
 struct PointLight {
+    vec3 position;
     float constant;
     float linear;
     float quadratic;
@@ -61,6 +66,11 @@ uniform PointLight pointLight;
 uniform AreaLight areaLight;
 uniform VolumeLight volumeLight;
 
+uniform sampler2D plShadowMap;
+
+
+
+/* -------------------------- LIGHTING -------------------------- */
 LightingComponents blinnPhong(vec3 N, vec3 L, vec3 V, vec3 Ka, vec3 Kd, vec3 Ks, float Ns) {
     LightingComponents components;
     vec3 H = normalize(L + V);
@@ -95,6 +105,15 @@ float directionalShadowMapping(vec3 N, vec3 L, vec4 posLightSpace) {
     return shadow;
 }
 
+vec3 pointLightBrightness(PointLight light, vec3 pos) {
+    vec3 diffuse = vec3(0.6);
+    float distance = length(light.position - pos);
+    float attenuation = 1.0 / (light.constant + light.linear * distance + 
+    		            light.quadratic * (distance * distance));
+    vec3 brightness = attenuation * diffuse;
+    return brightness;
+}
+
 
 
 /* ---------------------------- MAIN ---------------------------- */
@@ -106,50 +125,67 @@ void main() {
     vec3 ambient = texture(gAmbient, texCoords).rgb;
     vec3 specular = texture(gSpecular, texCoords).rgb;
 
-    // N, L, V in view space
-    vec4 lightPosView = MV * vec4(lightPos, 1.0);
-    vec4 P = MV * vec4(fragPos, 1.0);
-    vec3 N = normalize(mat3(MV) * normal);
-    vec3 L = normalize(lightPosView.xyz - P.xyz);
-    vec3 V = normalize(-P.xyz);
+    vec3 result = vec3(0.0);
 
-    // Blinn-Phong
-    LightingComponents blinnPhong = blinnPhong(N, L, V, ambient, diffuse, specular, 225);
+    if (displayType == 5) {
+        // N, L, V in view space
+        vec4 lightPosView = MV * vec4(lightPos, 1.0);
+        vec4 P = MV * vec4(fragPos, 1.0);
+        vec3 N = normalize(mat3(MV) * normal);
+        vec3 L = normalize(lightPosView.xyz - P.xyz);
+        vec3 V = normalize(-P.xyz);
 
-    // Directional Shadow Mapping
-    vec4 fragPosLightSpace = MDSM * vec4(fragPos, 1.0);
-    float shadow = 0.0f;
-    if (enableDSM) shadow = directionalShadowMapping(N, L, fragPosLightSpace);
+        // Blinn-Phong
+        LightingComponents blinnPhong = blinnPhong(N, L, V, ambient, diffuse, specular, 225);
 
-    // Point, Area, Volume Lights
-    switch (lightType) {
-        case 0:  // Point
-            break;
+        // Directional Shadow Mapping
+        vec4 fragPosLightSpace = MDSM * vec4(fragPos, 1.0);
+        float shadow = 0.0f;
+        if (enableDSM) shadow = directionalShadowMapping(N, L, fragPosLightSpace);
 
-        case 1:  // Area
-            break;
+        // Point, Area, Volume Lights
+        vec3 brightness = vec3(0.0);
+        if (enablePL) {
+            brightness += pointLightBrightness(pointLight, fragPos);
+        }
 
-        case 2:  // Volume
-            break;
-    }
-
-    // Output
-    float diffuseFactor = (1.0f - shadow);
-    vec3 result = enableBP
-        ? (blinnPhong.ambient + blinnPhong.diffuse * diffuseFactor + blinnPhong.specular)
-        : diffuse * diffuseFactor;
+        // Output
+        float diffuseFactor = (1.0f - shadow);
+        result = enableBP
+            ? brightness + (blinnPhong.ambient + blinnPhong.diffuse * diffuseFactor + blinnPhong.specular)
+            : brightness + diffuse * diffuseFactor;
     
-    // NPR
-    if (enableNPR) {
-        float intensity = dot(N, L);
-        if (intensity > 0.66)
-            result *= 1.25;
-        else if (intensity > 0.33)
-            result *= 1.0;
-        else
-            result *= 0.75;
+        // NPR
+        if (enableNPR) {
+            float intensity = dot(N, L);
+            if (intensity > 0.66)
+                result *= 1.25;
+            else if (intensity > 0.33)
+                result *= 1.0;
+            else
+                result *= 0.75;
+        }
     }
 
     // Final color
-    fragColor = vec4(result, 1.0);
+    switch (displayType) {
+        case 0:
+            fragColor = vec4(normalize(fragPos) * 0.5 + 0.5, 1.0);
+            break;
+        case 1:
+            fragColor = vec4(normalize(normal) * 0.5 + 0.5, 1.0);
+            break;
+        case 2:
+            fragColor = vec4(diffuse, 1.0);
+            break;
+        case 3:
+            fragColor = vec4(ambient, 1.0);
+            break;
+        case 4:
+            fragColor = vec4(specular, 1.0);
+            break;
+        case 5:
+            fragColor = vec4(result, 1.0);
+            break;
+    }
 }

@@ -75,6 +75,15 @@ void ShaderProgram::remove() {
 	}
 }
 
+void ShaderProgram::setMat4Array(const std::string& name, const std::vector<glm::mat4>& mats) const {
+	GLuint location = getUniformLocation(name);
+
+	for (size_t i = 0; i < mats.size(); i++) {
+		GLuint currentLocation = location + i;
+		glUniformMatrix4fv(location + i, 1, GL_FALSE, glm::value_ptr(mats[i]));
+	}
+}
+
 void ShaderProgram::setMat4(const std::string& name, const glm::mat4& mat) const {
 	glUniformMatrix4fv(getUniformLocation(name), 1, GL_FALSE, glm::value_ptr(mat));
 }
@@ -117,6 +126,23 @@ Shader::Shader(const char* vertexFile, const char* fragmentFile) {
 	const char* fragmentCode = fragmentCodeStr.c_str();
 
 	compileShader(vertexCode, GL_VERTEX_SHADER, "VERTEX");
+	compileShader(fragmentCode, GL_FRAGMENT_SHADER, "FRAGMENT");
+
+	linkProgram();
+}
+
+Shader::Shader(const char* vertexFile, const char* geometryFile, const char* fragmentFile) {
+	ID = glCreateProgram();
+
+	std::string vertexCodeStr = ShaderProgram::getFileContents(vertexFile);
+	std::string geometryCodeStr = ShaderProgram::getFileContents(geometryFile);
+	std::string fragmentCodeStr = ShaderProgram::getFileContents(fragmentFile);
+	const char* vertexCode = vertexCodeStr.c_str();
+	const char* geometryCode = geometryCodeStr.c_str();
+	const char* fragmentCode = fragmentCodeStr.c_str();
+
+	compileShader(vertexCode, GL_VERTEX_SHADER, "VERTEX");
+	compileShader(geometryCode, GL_GEOMETRY_SHADER, "GEOMETRY");
 	compileShader(fragmentCode, GL_FRAGMENT_SHADER, "FRAGMENT");
 
 	linkProgram();

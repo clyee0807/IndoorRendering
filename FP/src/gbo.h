@@ -12,6 +12,15 @@ enum GBOTextureType {
     GBO_NUM_TEXTURES          = 6,
 };
 
+const char* GBOTextureDisplayTypes[] = {
+    "Vertex",
+    "Normal",
+    "Diffuse",
+    "Ambient",
+    "Specular",
+    "Result"
+};
+
 class GBO {
     private:
         GLuint gbo, texture[GBO_NUM_TEXTURES];
@@ -55,14 +64,12 @@ class GBO {
                     glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, texture[i], 0);
                 } else {
                     glTexStorage2D(GL_TEXTURE_2D, 1, GL_DEPTH_COMPONENT32F, w, h);
-                    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-                    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-                    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
-                    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
                     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
                     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
                     glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, texture[i], 0);
                 }
+
+                glBindTexture(GL_TEXTURE_2D, 0);
             }
 
             // Draw buffers
@@ -79,8 +86,15 @@ class GBO {
             }
 
             // Unbind the framebuffer
-            glBindTexture(GL_TEXTURE_2D, 0);
-            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            unbind();
+        }
+
+        int getWidth() const {
+            return this->width;
+        }
+
+        int getHeight() const {
+            return this->height;
         }
 
         void resize(int newWidth, int newHeight) {

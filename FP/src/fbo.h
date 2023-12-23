@@ -3,6 +3,7 @@
 enum class FBOType {
     FBOType_2D = 0,
     FBOType_Depth  = 1,
+    FBOType_DepthCube = 2,
 };
 
 class FBO {
@@ -37,9 +38,10 @@ class FBO {
 
             // Create texture
             glGenTextures(1, &texture);
-            glBindTexture(GL_TEXTURE_2D, texture);
 
             if (t == FBOType::FBOType_2D) {
+                glBindTexture(GL_TEXTURE_2D, texture);
+
                 glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -54,6 +56,8 @@ class FBO {
                 glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT32, w, h);
                 glFramebufferRenderbuffer(GL_DRAW_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rbo);
             } else if (t == FBOType::FBOType_Depth) {
+                glBindTexture(GL_TEXTURE_2D, texture);
+
                 glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32F, w, h, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
@@ -64,6 +68,20 @@ class FBO {
                 float clampColor[4] = { 1.0f };
                 glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, clampColor);
                 glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, texture, 0);
+
+                glDrawBuffer(GL_NONE);
+                glReadBuffer(GL_NONE);
+            } else if (t == FBOType::FBOType_DepthCube) {
+                glBindTexture(GL_TEXTURE_CUBE_MAP, texture);
+                for (unsigned int i = 0; i < 6; i++) {
+                    glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_DEPTH_COMPONENT, w, h, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+                }
+                glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+                glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+                glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+                glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+                glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+                glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, texture, 0);
 
                 glDrawBuffer(GL_NONE);
                 glReadBuffer(GL_NONE);

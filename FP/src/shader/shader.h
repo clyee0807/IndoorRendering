@@ -33,6 +33,7 @@ class ShaderProgram {
 		GLuint getID() const;
 		void remove();
 
+		void setMat4Array(const std::string& name, const std::vector<glm::mat4>& mats) const;
 		void setMat4(const std::string& name, const glm::mat4& mat) const;
 		void setVec4(const std::string& name, const glm::vec4& vec) const;
 		void setVec3(const std::string& name, const glm::vec3& vec) const;
@@ -46,6 +47,7 @@ class ShaderProgram {
 class Shader : public ShaderProgram {
 	public:
 		Shader(const char* vertexFile, const char* fragmentFile);
+		Shader(const char* vertexFile, const char* geometryFile, const char* fragmentFile);
 };
 
 class ComputeShader : public ShaderProgram {

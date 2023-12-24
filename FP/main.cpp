@@ -113,7 +113,7 @@ vector<mat4> MPLS;
 AreaLight areaLight = {
     vec3(1.0, 0.5, -0.5)
 };
-vec3 aLightScale = vec3(1.0, 0.1, 1.0);
+vec3 aLightScale = vec3(1.0, 1.0, 0.01);
 mat4 MalS = scale(mat4(1.0), aLightScale);
 mat4 MalT(1.0f);
 mat4 Mal(1.0f);
@@ -401,19 +401,24 @@ static void renderModel(const Model& model, Shader& shader, const mat4& mMat, co
     model.render(shader);
 }
 
-static void renderScene(const Model& MODEL_ROOM, const Model& MODEL_TRICE, Shader& shader, GLuint shadowMap) {
+static void renderScene(const Model& MODEL_ROOM, const Model& MODEL_TRICE, const Model& MODEL_SPHERE, const Model& MODEL_RECT, Shader& shader, GLuint shadowMap) {
     shader.activate();
     shader.setTexture("shadowMap", shadowMap, 6);  // For modelSP
 
     renderModel(MODEL_ROOM, shader, mat4(1.0f), Mv, Mp);
     renderModel(MODEL_TRICE, shader, Mtrice, Mv, Mp);
+    renderModel(MODEL_SPHERE, shader, Mpl, Mv, Mp);
+    renderModel(MODEL_RECT, shader, Mal, Mv, Mp);
 }
 
 static void renderLight(const Model& MODEL_LIGHT, Shader& shader, LightType type) {
     shader.activate();
 
     // MVP
-    shader.setMat4("MM", Mpl);
+    if (type == LightType::LightType_Point)
+        shader.setMat4("MM", Mpl);
+    else if (type == LightType::LightType_Area)
+        shader.setMat4("MM", Mal);
     shader.setMat4("MV", Mv);
     shader.setMat4("MP", Mp);
 
@@ -473,14 +478,15 @@ static GLuint lightPass(GBO& sourceGBO, FBO& targetFBO, Shader& shader, GLuint d
     shader.setFloat("pointLight.constant", pointLight.constant);
     shader.setFloat("pointLight.linear", pointLight.linear);
     shader.setFloat("pointLight.quadratic", pointLight.quadratic);
-
+    // Area Light
+    shader.setVec3("areaLight.position", areaLight.position);
     // Options
     shader.setInt("displayType", displayType);
     shader.setInt("enableBP", enableBP);
     shader.setInt("enableDSM", enableDSM);
     shader.setInt("enableNPR", enableNPR);
     shader.setInt("enablePL", enablePL);
-
+    shader.setInt("enableAreaLight", enableAL);
     renderFullScreenQuad();
     targetFBO.unbind();
 
@@ -750,7 +756,10 @@ static void renderLightShadeMenu() {
             if (enablePL) {
                 ImGui::DragFloat3("Position", (float*)&pointLight.position, 0.01f, -2.0f, 2.0f, "%.2f");
             }
-
+            ImGui::Checkbox("Area Light", &enableAL);
+            if (enableAL) {
+                ImGui::DragFloat3("Position", (float*)&areaLight.position, 0.01f, -2.0f, 2.0f, "%.2f");
+            }
             ImGui::TreePop();
         }
     }
@@ -1212,7 +1221,7 @@ int main(void) {
 
             // Render scene
             sceneFBO.bind();
-            renderScene(room, trice, modelSP, dsmFBO.getTexture());
+            renderScene(room, trice, sphere, rect, modelSP, dsmFBO.getTexture());
             sceneFBO.unbind();
 
             currentTexture = sceneFBO.getTexture();
@@ -1226,7 +1235,7 @@ int main(void) {
 
             // Geometry Pass
             gbo.bindWrite();
-            renderScene(room, trice, geometrySP, dsmFBO.getTexture());
+            renderScene(room, trice, sphere, rect, geometrySP, dsmFBO.getTexture());
             gbo.unbind();
 
             // Lighting Pass

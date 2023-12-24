@@ -126,6 +126,11 @@ FBO gaussianHFBO(windowWidth, windowHeight, FBOType::FBOType_2D);
 FBO gaussianVFBO(windowWidth, windowHeight, FBOType::FBOType_2D);
 FBO bloomFBO(windowWidth, windowHeight, FBOType::FBOType_2D);
 float brightnessThreshold = 0.55, strength = 4.0;
+// Deferred Shading
+bool enableDeferredShading = true;
+// SSR
+FBO ssrFBO(windowWidth, windowHeight, FBOType::FBOType_2D);
+bool enableSSR = true;
 // NPR
 FBO edgeFBO(windowWidth, windowHeight, FBOType::FBOType_2D);
 bool enableNPR = true;
@@ -300,7 +305,8 @@ static void frameBufferSizeCallback(GLFWwindow* window, int width, int height) {
     gaussianHFBO.resize(width, height);
     gaussianVFBO.resize(width, height);
     bloomFBO.resize(width, height);
-
+    // SSR
+    ssrFBO.resize(width, height);
     // NPR
     edgeFBO.resize(width, height);
     
@@ -445,7 +451,19 @@ static GLuint lightPass(GBO& sourceGBO, FBO& targetFBO, Shader& shader, GLuint s
 
     return targetFBO.getTexture();
 }
-
+static GLuint ssr(GBO& sourceGBO, FBO& ssrFBO, Shader& ssrShader, GLuint sourceTex) {
+    ssrFBO.bind();
+    ssrShader.activate();
+    ssrShader.setTexture("gNormal", sourceGBO.getTexture(GBO_TEXTURE_TYPE_NORMAL), 0);
+    ssrShader.setTexture("gSpecular", sourceGBO.getTexture(GBO_TEXTURE_TYPE_NORMAL), 1);
+    ssrShader.setTexture("colorBuffer", sourceTex, 2);
+    ssrShader.setTexture("depthMap", sourceGBO.getTexture(GBO_TEXTURE_TYPE_DEPTH), 3);
+    ssrShader.setMat4("invProjection", inverse(Mp));
+    ssrShader.setMat4("projection", Mp);
+    renderFullScreenQuad();
+    ssrFBO.unbind();
+    return ssrFBO.getTexture();
+}
 static GLuint bloomFilter(Shader& brightPassShader, Shader& gaussianShader, Shader& bloomShader) {
     // Bright pass + Gaussian blur
     //brightPassFBO.bind();
@@ -484,7 +502,6 @@ static GLuint bloomFilter(Shader& brightPassShader, Shader& gaussianShader, Shad
 
     //currentTexture = bloomFBO.getTexture();
 }
-
 static GLuint npr(FBO& edgeFBO, Shader& nprShader, GLuint sourceTex) {
     // Cel is written in light pass shader,
     // due the need of N and L vectors.
@@ -719,7 +736,11 @@ static void renderLightShadeMenu() {
     if (ImGui::CollapsingHeader("Shading")) {
         // Shading - Normal Mapping
         ImGui::Checkbox("Enable Normal Map", &useNormalMap);
-
+        // Shading - Deferred Shading
+        ImGui::Checkbox("Enable Deferred Shading", &enableDeferredShading);
+        // Shading - SSR
+        ImGui::Checkbox("Enable SSR", &enableSSR);
+        
         // Shading - NPR
         ImGui::SetNextItemOpen(true, ImGuiCond_Once);
         if (ImGui::TreeNode("NPR")) {
@@ -1046,6 +1067,8 @@ int main(void) {
     Shader brightPassSP("FP/shaders/filter.vert", "FP/shaders/bright_pass.frag");
     Shader gaussianSP("FP/shaders/filter.vert", "FP/shaders/gaussian_blur.frag");
     Shader bloomSP("FP/shaders/filter.vert", "FP/shaders/bloom.frag");
+    // SSR
+    Shader ssrSP("FP/shaders/filter.vert", "FP/shaders/ssr.frag");
     // NPR
     Shader edgeSP("FP/shaders/filter.vert", "FP/shaders/edge_detection.frag");
     // FXAA
@@ -1065,6 +1088,8 @@ int main(void) {
     dsmFBO.init();
     // P, A, V Lights
     plFBO.init();
+    // SSR
+    ssrFBO.init();
     // NPR
     edgeFBO.init();
     // FXAA
@@ -1101,36 +1126,42 @@ int main(void) {
             dsmFBO.unbind();
         }
 
-#ifndef DEFERRED_SHADING
-        // Point Light
-        if (enablePL) {
-            plFBO.bind();
-            renderLight(sphere, modelSP, LightType::LightType_Point);
-            plFBO.unbind();
+        if (!enableDeferredShading)
+        {
+            // Point Light
+            if (enablePL) {
+                plFBO.bind();
+                renderLight(sphere, modelSP, LightType::LightType_Point);
+                plFBO.unbind();
+            }
+
+            // Render scene
+            sceneFBO.bind();
+            renderScene(room, trice, modelSP, dsmFBO.getTexture());
+            sceneFBO.unbind();
+
+            currentTexture = sceneFBO.getTexture();
         }
+        else
+        {
+            // ...And another thing — do NOT forget to disable GL_BLEND.  — anossovp, 8 years ago
+            // If I were find this comment a week ago, that would save a LOT of debugging  — Sandor Muranyi, 6 years ago
+            // https://learnopengl.com/Advanced-Lighting/Deferred-Shading
+            glDisable(GL_BLEND);
 
-        // Render scene
-        sceneFBO.bind();
-        renderScene(room, trice, modelSP, dsmFBO.getTexture());
-        sceneFBO.unbind();
-
-        currentTexture = sceneFBO.getTexture();
-#endif
-
-#ifdef DEFERRED_SHADING
-        // ...And another thing — do NOT forget to disable GL_BLEND.  — anossovp, 8 years ago
-        // If I were find this comment a week ago, that would save a LOT of debugging  — Sandor Muranyi, 6 years ago
-        // https://learnopengl.com/Advanced-Lighting/Deferred-Shading
-        glDisable(GL_BLEND);
-
-        // Geometry Pass
-        gbo.bindWrite();
-        renderScene(room, trice, geometrySP, dsmFBO.getTexture());
-        gbo.unbind();
+            // Geometry Pass
+            gbo.bindWrite();
+            renderScene(room, trice, geometrySP, dsmFBO.getTexture());
+            gbo.unbind();
         
-        // Lighting Pass
-        currentTexture = lightPass(gbo, sceneFBO, lightingSP, dsmFBO.getTexture());
-#endif
+            // Lighting Pass
+            currentTexture = lightPass(gbo, sceneFBO, lightingSP, dsmFBO.getTexture());
+        }
+        // SSR
+        if (enableSSR)
+        {
+            currentTexture = ssr(gbo, ssrFBO, ssrSP, currentTexture);
+        }
 
         // FXAA, NPR
         if (enableNPR)

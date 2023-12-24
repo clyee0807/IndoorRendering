@@ -161,6 +161,9 @@
     <ClCompile Include="src\texture\texture_array.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="shaders\al.frag" />
+    <None Include="shaders\al.geom" />
+    <None Include="shaders\al.vert" />
     <None Include="shaders\bloom.frag" />
     <None Include="shaders\bright_pass.frag" />
     <None Include="shaders\edge_detection.frag" />

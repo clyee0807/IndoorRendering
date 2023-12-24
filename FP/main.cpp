@@ -110,6 +110,14 @@ const float PLS_NEAR = 0.22f, PLS_FAR = 10.0f;
 mat4 MPLSp = perspective(radians(90.0f), (float)(1024 / 1024), PLS_NEAR, PLS_FAR);
 vector<mat4> MPLS;
 // Area Light
+AreaLight areaLight = {
+    vec3(1.0, 0.5, -0.5)
+};
+vec3 aLightScale = vec3(1.0, 0.1, 1.0);
+mat4 MalS = scale(mat4(1.0), aLightScale);
+mat4 MalT(1.0f);
+mat4 Mal(1.0f);
+bool enableAL = true;
 // Volume Light
 
 // Shaders
@@ -132,6 +140,8 @@ FBO gaussianHFBO(windowWidth, windowHeight, FBOType::FBOType_2D);
 FBO gaussianVFBO(windowWidth, windowHeight, FBOType::FBOType_2D);
 FBO bloomFBO(windowWidth, windowHeight, FBOType::FBOType_2D);
 float brightnessThreshold = 0.55, strength = 4.0;
+// Deferred Shading
+bool enableDeferredShading = true;
 // NPR
 FBO edgeFBO(windowWidth, windowHeight, FBOType::FBOType_2D);
 bool enableNPR = true;
@@ -141,6 +151,9 @@ FBO fxaaFBO(windowWidth, windowHeight, FBOType::FBOType_2D);
 bool enableFXAA = true;
 const char* FXAA_LEVELS[] = { "3", "4", "5" };
 const char* fxaaLevel = FXAA_LEVELS[2];
+// Area Light
+FBO alFBO(windowWidth, windowHeight, FBOType::FBOType_2D);
+// Volume Light
 
 // Screenshot
 const char* SS_FORMATS[] = { "JPEG", "PNG" };
@@ -353,6 +366,10 @@ static void updateMVP() {
     MPLS.push_back(MPLSp * lookAt(pointLight.position, pointLight.position + vec3( 0.0,-1.0, 0.0), vec3(0.0, 0.0,-1.0)));
     MPLS.push_back(MPLSp * lookAt(pointLight.position, pointLight.position + vec3( 0.0, 0.0, 1.0), vec3(0.0,-1.0, 0.0)));
     MPLS.push_back(MPLSp * lookAt(pointLight.position, pointLight.position + vec3( 0.0, 0.0,-1.0), vec3(0.0,-1.0, 0.0)));
+
+    // Area Light (rect)
+    MalT = translate(mat4(1.0f), areaLight.position);
+    Mal = MalT * MalS;
 }
 
 static void updateObjectPosition() {
@@ -745,16 +762,22 @@ static void renderLightShadeMenu() {
         ImGui::Checkbox("Enable Normal Map", &useNormalMap);
 
         // Shading - Deferred Shading
-        if (ImGui::BeginCombo("G-buffer Texture", GBOTextureDisplayTypes[displayType])) {
-            for (int i = 0; i < IM_ARRAYSIZE(GBOTextureDisplayTypes); i++) {
-                const bool isSelected = (i == displayType);
-                if (ImGui::Selectable(GBOTextureDisplayTypes[i], isSelected))
-                    displayType = i;
-                if (isSelected)
-                    ImGui::SetItemDefaultFocus();
+        ImGui::SetNextItemOpen(true, ImGuiCond_Once);
+        if (ImGui::TreeNode("Deferred Shading")) {
+            ImGui::Checkbox("Enable Deferred Shading", &enableDeferredShading);
+            if (enableDeferredShading) {
+                if (ImGui::BeginCombo("G-buffer Texture", GBOTextureDisplayTypes[displayType])) {
+                    for (int i = 0; i < IM_ARRAYSIZE(GBOTextureDisplayTypes); i++) {
+                        const bool isSelected = (i == displayType);
+                        if (ImGui::Selectable(GBOTextureDisplayTypes[i], isSelected))
+                            displayType = i;
+                        if (isSelected)
+                            ImGui::SetItemDefaultFocus();
+                    }
+                    ImGui::EndCombo();
+                }
             }
-
-            ImGui::EndCombo();
+            ImGui::TreePop();
         }
         ImGui::SameLine(); ImGui::TextDisabled("(?)");
         if (ImGui::IsItemHovered()) {
@@ -1095,6 +1118,8 @@ int main(void) {
     Shader edgeSP("FP/shaders/filter.vert", "FP/shaders/edge_detection.frag");
     // FXAA
     Shader fxaaSP("FP/shaders/filter.vert", "FP/shaders/fxaa.frag");
+    // Area Light
+    Shader alSP("FP/shaders/filter.vert", "FP/shaders/al.frag");
     // Output
     Shader finalSP("FP/shaders/filter.vert", "FP/shaders/final.frag");
 
@@ -1102,6 +1127,7 @@ int main(void) {
     Model room("FP/models/Grey White Room.obj");
     Model trice("FP/models/Trice.obj");
     Model sphere("FP/models/Sphere.obj");
+    Model rect("FP/models/Cube.obj");
 
     // GBO & FBOs
     gbo.init();
@@ -1115,7 +1141,8 @@ int main(void) {
     edgeFBO.init();
     // FXAA
     fxaaFBO.init();
-    
+    // Area Light
+    alFBO.init();
 
 
 #ifdef VSYNC_DISABLED
@@ -1146,7 +1173,6 @@ int main(void) {
             dsmSP.setMat4("MshadowMap", MDSM);
             room.render(dsmSP);
             dsmSP.setMat4("MshadowMap", MDSM * Mtrice);
-            trice.render(dsmSP);
             dsmFBO.unbind();
         }
 
@@ -1169,45 +1195,61 @@ int main(void) {
 
         glViewport(0, 0, windowWidth, windowHeight);
 
-#ifndef DEFERRED_SHADING
-        // Point Light
-        if (enablePL) {
+        if (!enableDeferredShading)
+        {
+            // Point Light
+            if (enablePL) {
+                plFBO.bind();
+                renderLight(sphere, modelSP, LightType::LightType_Point);
+                plFBO.unbind();
+            }
+            // Area Light
+            if (enableAL) {
+                alFBO.bind();
+                renderLight(rect, modelSP, LightType::LightType_Area);
+                alFBO.unbind();
+            }
+
+            // Render scene
+            sceneFBO.bind();
+            renderScene(room, trice, modelSP, dsmFBO.getTexture());
+            sceneFBO.unbind();
+
+            currentTexture = sceneFBO.getTexture();
+        }
+        else
+        {
+            // ...And another thing — do NOT forget to disable GL_BLEND.  — anossovp, 8 years ago
+            // If I were find this comment a week ago, that would save a LOT of debugging  — Sandor Muranyi, 6 years ago
+            // https://learnopengl.com/Advanced-Lighting/Deferred-Shading
+            glDisable(GL_BLEND);
+
+            // Geometry Pass
+            gbo.bindWrite();
+            renderScene(room, trice, geometrySP, dsmFBO.getTexture());
+            gbo.unbind();
+
+            // Lighting Pass
+            currentTexture = lightPass(gbo, sceneFBO, lightingSP, dsmFBO.getTexture(), plsFBO.getTexture());
+
+            // Light Source Rendering
+            gbo.bindRead();
             plFBO.bind();
+            glBlitFramebuffer(0, 0, gbo.getWidth(), gbo.getHeight(),
+                              0, 0, gbo.getWidth(), gbo.getHeight(),
+                              GL_DEPTH_BUFFER_BIT, GL_NEAREST);
             renderLight(sphere, modelSP, LightType::LightType_Point);
             plFBO.unbind();
+
+            // Area Light
+            gbo.bindRead();
+            alFBO.bind();
+            glBlitFramebuffer(0, 0, gbo.getWidth(), gbo.getHeight(),
+                0, 0, gbo.getWidth(), gbo.getHeight(),
+                GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+            renderLight(rect, modelSP, LightType::LightType_Area);
+            alFBO.unbind();
         }
-
-        // Render scene
-        sceneFBO.bind();
-        renderScene(room, trice, modelSP, dsmFBO.getTexture());
-        sceneFBO.unbind();
-
-        currentTexture = sceneFBO.getTexture();
-#endif
-
-#ifdef DEFERRED_SHADING
-        // ...And another thing — do NOT forget to disable GL_BLEND.  — anossovp, 8 years ago
-        // If I were find this comment a week ago, that would save a LOT of debugging  — Sandor Muranyi, 6 years ago
-        // https://learnopengl.com/Advanced-Lighting/Deferred-Shading
-        glDisable(GL_BLEND);
-
-        // Geometry Pass
-        gbo.bindWrite();
-        renderScene(room, trice, geometrySP, dsmFBO.getTexture());
-        gbo.unbind();
-        
-        // Lighting Pass
-        currentTexture = lightPass(gbo, sceneFBO, lightingSP, dsmFBO.getTexture(), plsFBO.getTexture());
-
-        // Light Source Rendering
-        /*gbo.bindRead();
-        plFBO.bind();
-        glBlitFramebuffer(0, 0, gbo.getWidth(), gbo.getHeight(),
-                          0, 0, gbo.getWidth(), gbo.getHeight(),
-                          GL_DEPTH_BUFFER_BIT, GL_NEAREST);
-        renderLight(sphere, modelSP, LightType::LightType_Point);
-        plFBO.unbind();*/
-#endif
 
         // FXAA, NPR
         if (displayType == 5) {

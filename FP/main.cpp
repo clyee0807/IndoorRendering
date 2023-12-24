@@ -92,9 +92,19 @@ struct PointLight {
 };
 struct AreaLight {
     vec3 position;
+    vec3 direction;
+    vec3 scale;
+    vec3 color;
 };
 struct VolumeLight {
     vec3 position;
+    int samplesPerRay;
+    float exposure;
+    float decay;
+    float weight;
+    float density;
+    float sampleWeight;
+    vec3 backgroundColor;
 };
 // Point Light
 PointLight pointLight = {
@@ -111,15 +121,21 @@ mat4 MPLSp = perspective(radians(90.0f), (float)(1024 / 1024), PLS_NEAR, PLS_FAR
 vector<mat4> MPLS;
 // Area Light
 AreaLight areaLight = {
-    vec3(1.0, 0.5, -0.5)
+    vec3(1.0, 0.5, -0.5), vec3(0.0, 0.0, 1.0), vec3(1.0, 1.0, 0.01), vec3(0.8, 0.6, 0.0)
 };
-vec3 aLightScale = vec3(1.0, 1.0, 0.01);
-mat4 MalS = scale(mat4(1.0), aLightScale);
+mat4 MalS = scale(mat4(1.0), areaLight.scale);
 mat4 MalT(1.0f);
 mat4 Mal(1.0f);
 bool enableAL = true;
 // Volume Light
-
+VolumeLight volumeLight = {
+    vec3(-2.845 * 5, 2.028 * 2.5, -1.293 * 5), 100, 0.2, 0.96815, 0.58767, 0.926, 0.4, vec3(0.19, 0.19, 0.19)
+};
+float vLightScale = 1.5f;
+mat4 MvlS = scale(mat4(1.0f), vec3(vLightScale));
+mat4 MvlT(1.0f);
+mat4 Mvl(1.0f);
+bool enableVL = true;
 // Shaders
 GLuint rectVAO, rectVBO, currentTexture;
 FBO sceneFBO(windowWidth, windowHeight, FBOType::FBOType_2D);
@@ -154,7 +170,7 @@ const char* fxaaLevel = FXAA_LEVELS[2];
 // Area Light
 FBO alFBO(windowWidth, windowHeight, FBOType::FBOType_2D);
 // Volume Light
-
+FBO vlFBO(windowWidth, windowHeight, FBOType::FBOType_2D);
 // Screenshot
 const char* SS_FORMATS[] = { "JPEG", "PNG" };
 const char* ssFormat = SS_FORMATS[0];
@@ -325,6 +341,10 @@ static void frameBufferSizeCallback(GLFWwindow* window, int width, int height) {
     
     // FXAA
     fxaaFBO.resize(width, height);
+
+    // Area Light
+    alFBO.resize(width, height);
+    vlFBO.resize(width, height);
 }
 
 
@@ -370,6 +390,9 @@ static void updateMVP() {
     // Area Light (rect)
     MalT = translate(mat4(1.0f), areaLight.position);
     Mal = MalT * MalS;
+    // Volume Light
+    MvlT = translate(mat4(1.0f), volumeLight.position);
+    Mvl = MvlT * MvlS;
 }
 
 static void updateObjectPosition() {
@@ -409,6 +432,7 @@ static void renderScene(const Model& MODEL_ROOM, const Model& MODEL_TRICE, const
     renderModel(MODEL_TRICE, shader, Mtrice, Mv, Mp);
     renderModel(MODEL_SPHERE, shader, Mpl, Mv, Mp);
     renderModel(MODEL_RECT, shader, Mal, Mv, Mp);
+    renderModel(MODEL_SPHERE, shader, Mvl, Mv, Mp);
 }
 
 static void renderLight(const Model& MODEL_LIGHT, Shader& shader, LightType type) {
@@ -419,6 +443,8 @@ static void renderLight(const Model& MODEL_LIGHT, Shader& shader, LightType type
         shader.setMat4("MM", Mpl);
     else if (type == LightType::LightType_Area)
         shader.setMat4("MM", Mal);
+    else if (type == LightType::LightType_Volume)
+        shader.setMat4("MM", Mvl);
     shader.setMat4("MV", Mv);
     shader.setMat4("MP", Mp);
 
@@ -480,6 +506,18 @@ static GLuint lightPass(GBO& sourceGBO, FBO& targetFBO, Shader& shader, GLuint d
     shader.setFloat("pointLight.quadratic", pointLight.quadratic);
     // Area Light
     shader.setVec3("areaLight.position", areaLight.position);
+    shader.setVec3("areaLight.direction", areaLight.direction);
+    shader.setVec3("areaLight.scale", areaLight.scale);
+    shader.setVec3("areaLight.color", areaLight.color);
+    // Volume Light
+    shader.setVec3("volumeLight.position", volumeLight.position);
+    shader.setInt("volumeLight.samplesPerRay", volumeLight.samplesPerRay);
+    shader.setFloat("volumeLight.exposure", volumeLight.exposure);
+    shader.setFloat("volumeLight.decay", volumeLight.decay);
+    shader.setFloat("volumeLight.weight", volumeLight.weight);
+    shader.setFloat("volumeLight.density", volumeLight.density);
+    shader.setFloat("volumeLight.sampleWeight", volumeLight.sampleWeight);
+    shader.setVec3("volumeLight.backgroundColor", volumeLight.backgroundColor);
     // Options
     shader.setInt("displayType", displayType);
     shader.setInt("enableBP", enableBP);
@@ -487,6 +525,7 @@ static GLuint lightPass(GBO& sourceGBO, FBO& targetFBO, Shader& shader, GLuint d
     shader.setInt("enableNPR", enableNPR);
     shader.setInt("enablePL", enablePL);
     shader.setInt("enableAreaLight", enableAL);
+    shader.setInt("enableVolumeLight", enableVL);
     renderFullScreenQuad();
     targetFBO.unbind();
 
@@ -754,12 +793,13 @@ static void renderLightShadeMenu() {
         if (ImGui::TreeNode("Point/Area/Volume Lights")) {
             ImGui::Checkbox("Point Light", &enablePL);
             if (enablePL) {
-                ImGui::DragFloat3("Position", (float*)&pointLight.position, 0.01f, -2.0f, 2.0f, "%.2f");
+                //ImGui::DragFloat3("Position", (float*)&pointLight.position, 0.01f, -2.0f, 2.0f, "%.2f");
             }
             ImGui::Checkbox("Area Light", &enableAL);
             if (enableAL) {
-                ImGui::DragFloat3("Position", (float*)&areaLight.position, 0.01f, -2.0f, 2.0f, "%.2f");
+                //ImGui::DragFloat3("Position", (float*)&areaLight.position, 0.01f, -2.0f, 2.0f, "%.2f");
             }
+            ImGui::Checkbox("Volume Light", &enableVL);
             ImGui::TreePop();
         }
     }
@@ -1128,7 +1168,6 @@ int main(void) {
     // FXAA
     Shader fxaaSP("FP/shaders/filter.vert", "FP/shaders/fxaa.frag");
     // Area Light
-    Shader alSP("FP/shaders/filter.vert", "FP/shaders/al.frag");
     // Output
     Shader finalSP("FP/shaders/filter.vert", "FP/shaders/final.frag");
 
@@ -1152,7 +1191,7 @@ int main(void) {
     fxaaFBO.init();
     // Area Light
     alFBO.init();
-
+    vlFBO.init();
 
 #ifdef VSYNC_DISABLED
     glfwSwapInterval(0);
@@ -1218,7 +1257,11 @@ int main(void) {
                 renderLight(rect, modelSP, LightType::LightType_Area);
                 alFBO.unbind();
             }
-
+            if (enableVL) {
+                vlFBO.bind();
+                renderLight(sphere, modelSP, LightType::LightType_Volume);
+                vlFBO.unbind();
+            }
             // Render scene
             sceneFBO.bind();
             renderScene(room, trice, sphere, rect, modelSP, dsmFBO.getTexture());

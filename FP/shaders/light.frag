@@ -57,9 +57,19 @@ struct PointLight {
 };
 struct AreaLight {
     vec3 position;
+    vec3 direction;
+    vec3 scale;
+    vec3 color;
 };
 struct VolumeLight {
     vec3 position;
+    int samplesPerRay;
+    float exposure;
+    float decay;
+    float weight;
+    float density;
+    float sampleWeight;
+    vec3 backgroundColor;
 };
 
 uniform PointLight pointLight;
@@ -114,33 +124,62 @@ vec3 pointLightBrightness(PointLight light, vec3 pos) {
     return brightness;
 }
 vec3 areaLightBrightness(AreaLight light, vec3 pos) {
-    vec3 direction = vec3(0.0, 0.0, 1.0);
-    vec3 scale = vec3(1.0, 1.0, 0.01);
-    vec3 color = vec3(0.8, 0.6, 0.0);
     float intensity = 0.4f;
 
-    vec3 diffuse = color; // Adjust the color of the area light
+    vec3 diffuse = light.color; // Adjust the color of the area light
 
     // Calculate the direction from the point to the area light
     vec3 lightDir = normalize(light.position - pos);
 
-    lightDir /= scale;
+    lightDir /= light.scale;
 
     // Calculate the distance from the point to the area light
     float distance = length(light.position - pos);
 
     // Calculate the cosine of the angle between the light direction and the surface normal
-    float cosTheta = dot(lightDir, normalize(direction));
+    float cosTheta = dot(lightDir, normalize(light.direction));
 
     // Calculate the attenuation based on distance and angle
-    float attenuation = 1.0 / (scale.x * scale.y * distance * distance) * max(cosTheta, 0.0);
+    float attenuation = 1.0 / (light.scale.x * light.scale.y * distance * distance) * max(cosTheta, 0.0);
 
     // Calculate the brightness
     vec3 brightness = intensity * attenuation * diffuse;
 
     return brightness;
 }
+vec3 volumeLightBrightness(VolumeLight light, vec3 pos, vec3 viewDir) {
+    // Constants
+    float stepSize = 1.0 / float(light.samplesPerRay);
+    vec3 accumulatedLight = vec3(0.0);
+    vec3 rayStart = light.position;
 
+    // Sample along the ray passing through the volume
+    for (int i = 0; i < light.samplesPerRay; ++i)
+    {
+        // Compute the current sample point along the ray
+        vec3 samplePoint = rayStart + float(i) * stepSize * viewDir;
+
+        // Compute the distance from the current sample point to the camera position
+        float distanceToCamera = length(samplePoint - pos);
+
+        // Compute the attenuation based on distance
+        float attenuation = exp(-light.density * distanceToCamera) * pow(light.decay, float(i));
+
+        // Compute the brightness at the current sample point
+        vec3 sampleBrightness = vec3(attenuation * light.weight * light.sampleWeight);
+
+        // Accumulate the brightness
+        accumulatedLight += sampleBrightness;
+    }
+
+    // Apply the remaining factors in the lighting equation
+    vec3 finalBrightness = light.exposure * accumulatedLight / float(light.samplesPerRay);
+
+    // Add background color
+    finalBrightness += light.backgroundColor;
+
+    return finalBrightness;
+}
 
 /* ---------------------------- MAIN ---------------------------- */
 void main() {
@@ -174,8 +213,11 @@ void main() {
         if (enablePL) {
             brightness += pointLightBrightness(pointLight, fragPos);
         }
-        else if (enableAreaLight) {
+        if (enableAreaLight) {
             brightness += areaLightBrightness(areaLight, fragPos);
+        }
+        if (enableVolumeLight) {
+            brightness += volumeLightBrightness(volumeLight, fragPos, V);
         }
         // Output
         float diffuseFactor = (1.0f - shadow);

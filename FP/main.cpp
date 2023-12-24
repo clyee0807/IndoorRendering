@@ -83,6 +83,9 @@ const vec3 DSM_TARGET(0.542, -0.141, -0.422);
 const float DSM_RANGE = 5.0f, DSM_NEAR = 0.1f, DSM_FAR = 10.0f;
 mat4 MDSMp = ortho(DSM_RANGE / -2, DSM_RANGE / 2, DSM_RANGE / -2, DSM_RANGE / 2, DSM_NEAR, DSM_FAR);
 mat4 MDSMv(1.0f), MDSM(1.0f);
+// Depth
+mat4 MDMp = ortho(-1.0f, 1.0f, -1.0f, 1.0f, zNear, zFar);
+mat4 MDMv(1.0f), MDM(1.0f);
 // P, A, V Lights
 enum class LightType {
     LightType_Point = 0,
@@ -129,6 +132,7 @@ float brightnessThreshold = 0.55, strength = 4.0;
 // Deferred Shading
 bool enableDeferredShading = true;
 // SSR
+FBO depthFBO(1024, 1024, FBOType::FBOType_Depth);
 FBO ssrFBO(windowWidth, windowHeight, FBOType::FBOType_2D);
 bool enableSSR = true;
 // NPR
@@ -306,6 +310,7 @@ static void frameBufferSizeCallback(GLFWwindow* window, int width, int height) {
     gaussianVFBO.resize(width, height);
     bloomFBO.resize(width, height);
     // SSR
+    depthFBO.resize(width, height);
     ssrFBO.resize(width, height);
     // NPR
     edgeFBO.resize(width, height);
@@ -344,6 +349,11 @@ static void updateMVP() {
     // Lighting
     MDSMv = lookAt(lightPos, DSM_TARGET, UP_VEC);
     MDSM = MDSMp * MDSMv;
+
+    // Depth
+    vec3 lightDirection = normalize(vec3(1.0, -1.0, -1.0));
+    MDMv = lookAt(lightPos, lightPos+lightDirection, UP_VEC);
+    MDM = MDMp * MDMv;
 }
 
 static void updateObjectPosition() {
@@ -365,7 +375,8 @@ static void renderModel(const Model& model, Shader& shader, const mat4& mMat, co
     shader.setInt("sampleRadius", sampleRadius);
     shader.setFloat("shadowBias", shadowBias);
     shader.setFloat("biasVariation", biasVariation);
-
+    // Depth
+    shader.setMat4("MDM", MDM);
     // Options
     shader.setInt("useNM", useNormalMap);  // Common
     shader.setInt("enableBP", enableBP);
@@ -375,10 +386,10 @@ static void renderModel(const Model& model, Shader& shader, const mat4& mMat, co
     model.render(shader);
 }
 
-static void renderScene(const Model& MODEL_ROOM, const Model& MODEL_TRICE, Shader& shader, GLuint shadowMap) {
+static void renderScene(const Model& MODEL_ROOM, const Model& MODEL_TRICE, Shader& shader, GLuint shadowMap, GLuint depthMap) {
     shader.activate();
     shader.setTexture("shadowMap", shadowMap, 6);  // For modelSP
-
+    shader.setTexture("depthMap", depthMap, 9);
     renderModel(MODEL_ROOM, shader, mat4(1.0f), Mv, Mp);
     renderModel(MODEL_TRICE, shader, Mtrice, Mv, Mp);
 }
@@ -451,13 +462,13 @@ static GLuint lightPass(GBO& sourceGBO, FBO& targetFBO, Shader& shader, GLuint s
 
     return targetFBO.getTexture();
 }
-static GLuint ssr(GBO& sourceGBO, FBO& ssrFBO, Shader& ssrShader, GLuint sourceTex) {
+static GLuint ssr(GBO& sourceGBO, FBO& ssrFBO, Shader& ssrShader, GLuint sourceTex, GLuint depthMap) {
     ssrFBO.bind();
     ssrShader.activate();
     ssrShader.setTexture("gNormal", sourceGBO.getTexture(GBO_TEXTURE_TYPE_NORMAL), 0);
     ssrShader.setTexture("gSpecular", sourceGBO.getTexture(GBO_TEXTURE_TYPE_NORMAL), 1);
     ssrShader.setTexture("colorBuffer", sourceTex, 2);
-    ssrShader.setTexture("depthMap", sourceGBO.getTexture(GBO_TEXTURE_TYPE_DEPTH), 3);
+    ssrShader.setTexture("depthMap", depthMap, 3);
     ssrShader.setMat4("invProjection", inverse(Mp));
     ssrShader.setMat4("projection", Mp);
     renderFullScreenQuad();
@@ -1068,6 +1079,7 @@ int main(void) {
     Shader gaussianSP("FP/shaders/filter.vert", "FP/shaders/gaussian_blur.frag");
     Shader bloomSP("FP/shaders/filter.vert", "FP/shaders/bloom.frag");
     // SSR
+    Shader depthSP("FP/shaders/depth.vert", "FP/shaders/depth.frag");
     Shader ssrSP("FP/shaders/filter.vert", "FP/shaders/ssr.frag");
     // NPR
     Shader edgeSP("FP/shaders/filter.vert", "FP/shaders/edge_detection.frag");
@@ -1089,6 +1101,7 @@ int main(void) {
     // P, A, V Lights
     plFBO.init();
     // SSR
+    depthFBO.init();
     ssrFBO.init();
     // NPR
     edgeFBO.init();
@@ -1125,7 +1138,19 @@ int main(void) {
             trice.render(dsmSP);
             dsmFBO.unbind();
         }
-
+        // Depth
+        {
+            depthFBO.bind();
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            depthSP.activate();
+            depthSP.setMat4("MDM", MDM);
+            glCullFace(GL_FRONT);
+            room.render(depthSP);
+            depthSP.setMat4("MDM", MDM * Mtrice);
+            trice.render(depthSP);
+            glCullFace(GL_BACK);
+            depthFBO.unbind();
+        }
         if (!enableDeferredShading)
         {
             // Point Light
@@ -1137,7 +1162,7 @@ int main(void) {
 
             // Render scene
             sceneFBO.bind();
-            renderScene(room, trice, modelSP, dsmFBO.getTexture());
+            renderScene(room, trice, modelSP, dsmFBO.getTexture(), depthFBO.getTexture());
             sceneFBO.unbind();
 
             currentTexture = sceneFBO.getTexture();
@@ -1151,7 +1176,7 @@ int main(void) {
 
             // Geometry Pass
             gbo.bindWrite();
-            renderScene(room, trice, geometrySP, dsmFBO.getTexture());
+            renderScene(room, trice, geometrySP, dsmFBO.getTexture(), depthFBO.getTexture());
             gbo.unbind();
         
             // Lighting Pass
@@ -1160,7 +1185,7 @@ int main(void) {
         // SSR
         if (enableSSR)
         {
-            currentTexture = ssr(gbo, ssrFBO, ssrSP, currentTexture);
+            currentTexture = ssr(gbo, ssrFBO, ssrSP, currentTexture, depthFBO.getTexture());
         }
 
         // FXAA, NPR

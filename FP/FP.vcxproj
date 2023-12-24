@@ -163,6 +163,8 @@
   <ItemGroup>
     <None Include="shaders\bloom.frag" />
     <None Include="shaders\bright_pass.frag" />
+    <None Include="shaders\depth.frag" />
+    <None Include="shaders\depth.vert" />
     <None Include="shaders\edge_detection.frag" />
     <None Include="shaders\cel.frag" />
     <None Include="shaders\dsm.frag" />

@@ -29,7 +29,8 @@ uniform mat4 MP;
 uniform mat4 MDSM;
 uniform vec3 lightPos;
 
-
+// Depth
+uniform mat4 MSM;
 
 /* ---------------------------- MAIN ---------------------------- */
 void main() {

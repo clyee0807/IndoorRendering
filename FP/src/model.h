@@ -83,8 +83,8 @@ class Model {
                 bool hasNormalMap = meshList[i].normHandle > 0;
                 shader.setInt("hasTex", hasTexture);
                 shader.setInt("hasNM", hasNormalMap);
-                shader.setTexture("tex", meshList[i].texHandle, 0);
-                shader.setTexture("normalMap", meshList[i].normHandle, 1);
+                shader.setTexture2D("tex", meshList[i].texHandle, 0);
+                shader.setTexture2D("normalMap", meshList[i].normHandle, 1);
 
                 // Material
                 shader.setVec4("material.Ka", meshList[i].mats.Ka);

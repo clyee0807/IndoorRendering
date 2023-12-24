@@ -65,7 +65,7 @@ mat4 Mtrice = MtriceT * MtriceS;
 // Camera
 float fov = radians(60.0f);
 float aspectRatio = (float)windowWidth / (float)windowHeight;
-float zNear = 0.01f, zFar = 150.0f;
+float zNear = 0.1f, zFar = 10.0f;
 const vec3 UP_VEC(0.0f, 1.0f, 0.0f);
 // Distance (R), Theta (θ), Phi (φ), Focus; FoV, Aspect Ratio, Near, Far, Up vector
 Camera camera(1.0f, 90.0f, 0.0f, vec3(0.0f), fov, aspectRatio, zNear, zFar, UP_VEC);
@@ -106,9 +106,12 @@ mat4 MplT(1.0f);
 mat4 Mpl(1.0f);
 bool enablePL = true;
 // Point Light Shadow
+bool enablePLS = true;
 const float PLS_NEAR = 0.22f, PLS_FAR = 10.0f;
 mat4 MPLSp = perspective(radians(90.0f), (float)(1024 / 1024), PLS_NEAR, PLS_FAR);
 vector<mat4> MPLS;
+float plSampleRadius = 0.05, plShadowBias = 0.15;
+int plSamples = 20;
 // Area Light
 // Volume Light
 
@@ -386,7 +389,7 @@ static void renderModel(const Model& model, Shader& shader, const mat4& mMat, co
 
 static void renderScene(const Model& MODEL_ROOM, const Model& MODEL_TRICE, Shader& shader, GLuint shadowMap) {
     shader.activate();
-    shader.setTexture("shadowMap", shadowMap, 6);  // For modelSP
+    shader.setTexture2D("shadowMap", shadowMap, 6);  // For modelSP
 
     renderModel(MODEL_ROOM, shader, mat4(1.0f), Mv, Mp);
     renderModel(MODEL_TRICE, shader, Mtrice, Mv, Mp);
@@ -430,17 +433,18 @@ static GLuint lightPass(GBO& sourceGBO, FBO& targetFBO, Shader& shader, GLuint d
     // Lighting Pass
     targetFBO.bind();
     shader.activate();
-    shader.setTexture("gPosition", sourceGBO.getTexture(GBO_TEXTURE_TYPE_VERTEX), 0);
-    shader.setTexture("gNormal", sourceGBO.getTexture(GBO_TEXTURE_TYPE_NORMAL), 1);
-    shader.setTexture("gDiffuse", sourceGBO.getTexture(GBO_TEXTURE_TYPE_DIFFUSE), 2);
-    shader.setTexture("gAmbient", sourceGBO.getTexture(GBO_TEXTURE_TYPE_AMBIENT), 3);
-    shader.setTexture("gSpecular", sourceGBO.getTexture(GBO_TEXTURE_TYPE_SPECULAR), 4);
-    shader.setTexture("shadowMap", dShadowMap, 6);
-    shader.setTexture("plShadowMap", plShadowMap, 7);
+    shader.setTexture2D("gPosition", sourceGBO.getTexture(GBO_TEXTURE_TYPE_VERTEX), 0);
+    shader.setTexture2D("gNormal", sourceGBO.getTexture(GBO_TEXTURE_TYPE_NORMAL), 1);
+    shader.setTexture2D("gDiffuse", sourceGBO.getTexture(GBO_TEXTURE_TYPE_DIFFUSE), 2);
+    shader.setTexture2D("gAmbient", sourceGBO.getTexture(GBO_TEXTURE_TYPE_AMBIENT), 3);
+    shader.setTexture2D("gSpecular", sourceGBO.getTexture(GBO_TEXTURE_TYPE_SPECULAR), 4);
+    shader.setTexture2D("shadowMap", dShadowMap, 6);
+    shader.setTextureCube("plShadowMap", plShadowMap, 7);
 
     // MVP
     shader.setMat4("MV", Mv);
     shader.setMat4("MP", Mp);
+    shader.setVec3("viewPos", camera.getPosition());
 
     // Lighting
     shader.setMat4("MDSM", MDSM);
@@ -456,6 +460,10 @@ static GLuint lightPass(GBO& sourceGBO, FBO& targetFBO, Shader& shader, GLuint d
     shader.setFloat("pointLight.constant", pointLight.constant);
     shader.setFloat("pointLight.linear", pointLight.linear);
     shader.setFloat("pointLight.quadratic", pointLight.quadratic);
+    shader.setFloat("plsFarPlane", PLS_FAR);
+    shader.setFloat("plSampleRadius", plSampleRadius);
+    shader.setFloat("plShadowBias", plShadowBias);
+    shader.setInt("plSamples", plSamples);
 
     // Options
     shader.setInt("displayType", displayType);
@@ -463,6 +471,7 @@ static GLuint lightPass(GBO& sourceGBO, FBO& targetFBO, Shader& shader, GLuint d
     shader.setInt("enableDSM", enableDSM);
     shader.setInt("enableNPR", enableNPR);
     shader.setInt("enablePL", enablePL);
+    shader.setInt("enablePLS", enablePLS);
 
     renderFullScreenQuad();
     targetFBO.unbind();
@@ -730,8 +739,15 @@ static void renderLightShadeMenu() {
         ImGui::SetNextItemOpen(true, ImGuiCond_Once);
         if (ImGui::TreeNode("Point/Area/Volume Lights")) {
             ImGui::Checkbox("Point Light", &enablePL);
+            if (!enablePL) enablePLS = false;
             if (enablePL) {
-                ImGui::DragFloat3("Position", (float*)&pointLight.position, 0.01f, -2.0f, 2.0f, "%.2f");
+                ImGui::DragFloat3("Position", (float*)&pointLight.position, 0.01f, -3.0f, 3.0f, "%.2f");
+                ImGui::Checkbox("Point Light Shadow", &enablePLS);
+                if (enablePLS) {
+                    ImGui::SliderFloat("Sample Radius", &plSampleRadius, 0.01f, 0.1f, "%.2f");
+                    ImGui::SliderFloat("Shadow Bias", &plShadowBias, 0.01f, 0.2f, "%.3f");
+                    ImGui::SliderInt("Samples", &plSamples, 4, 32, "%d");
+                }
             }
 
             ImGui::TreePop();
@@ -1200,8 +1216,8 @@ int main(void) {
         currentTexture = lightPass(gbo, sceneFBO, lightingSP, dsmFBO.getTexture(), plsFBO.getTexture());
 
         // Light Source Rendering
-        /*gbo.bindRead();
-        plFBO.bind();
+        /*plFBO.bindWrite();
+        gbo.bindRead();
         glBlitFramebuffer(0, 0, gbo.getWidth(), gbo.getHeight(),
                           0, 0, gbo.getWidth(), gbo.getHeight(),
                           GL_DEPTH_BUFFER_BIT, GL_NEAREST);

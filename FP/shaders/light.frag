@@ -7,6 +7,7 @@ in vec2 texCoords;
 // MVP
 uniform mat4 MV;
 uniform mat4 MP;
+uniform vec3 viewPos;
 
 // Lighting
 uniform mat4 MDSM;
@@ -26,6 +27,7 @@ uniform bool enableDSM;
 uniform bool enableNPR;
 
 uniform bool enablePL;
+uniform bool enablePLS;
 uniform bool enableAreaLight;
 uniform bool enableVolumeLight;
 
@@ -47,7 +49,6 @@ uniform float shadowBias;
 uniform float biasVariation;
 uniform sampler2D shadowMap;
 
-
 // P, A, V Lights
 struct PointLight {
     vec3 position;
@@ -66,7 +67,11 @@ uniform PointLight pointLight;
 uniform AreaLight areaLight;
 uniform VolumeLight volumeLight;
 
-uniform sampler2D plShadowMap;
+uniform samplerCube plShadowMap;
+uniform float plsFarPlane;
+uniform float plSampleRadius;
+uniform float plShadowBias;
+uniform int plSamples;
 
 
 
@@ -105,13 +110,51 @@ float directionalShadowMapping(vec3 N, vec3 L, vec4 posLightSpace) {
     return shadow;
 }
 
-vec3 pointLightBrightness(PointLight light, vec3 pos) {
-    vec3 diffuse = vec3(0.6);
+vec3 pointLightBrightness(PointLight light, vec3 N, vec3 L, vec3 pos, vec3 Ka, vec3 Kd, vec3 Ks, float Ns) {
+    // Diffuse shading
+    float diff = max(dot(N, L), 0.0);
+    
+    // Specular shading
+    vec3 reflectDir = reflect(-L, N);
+    float spec = pow(max(dot(normalize(viewPos - light.position), reflectDir), 0.0), Ns);
+
+    // Attenuation
     float distance = length(light.position - pos);
     float attenuation = 1.0 / (light.constant + light.linear * distance + 
     		            light.quadratic * (distance * distance));
-    vec3 brightness = attenuation * diffuse;
-    return brightness;
+    // Result
+    vec3 ambient  = attenuation * Ia * Ka.rgb;
+    vec3 diffuse  = attenuation * Id * diff * Kd;
+    vec3 specular = attenuation * Is * Ks.rgb;
+    return (ambient + diffuse + specular);
+}
+
+// array of offset direction for sampling
+vec3 gridSamplingDisk[20] = vec3[] (
+   vec3(1, 1, 1), vec3( 1,-1, 1), vec3(-1,-1, 1), vec3(-1, 1, 1), 
+   vec3(1, 1,-1), vec3( 1,-1,-1), vec3(-1,-1,-1), vec3(-1, 1,-1),
+   vec3(1, 1, 0), vec3( 1,-1, 0), vec3(-1,-1, 0), vec3(-1, 1, 0),
+   vec3(1, 0, 1), vec3(-1, 0, 1), vec3( 1, 0,-1), vec3(-1, 0,-1),
+   vec3(0, 1, 1), vec3( 0,-1, 1), vec3( 0,-1,-1), vec3( 0, 1,-1)
+);
+
+float pointLightShadowMapping(vec3 fragPos) {
+    vec3 fragToLight = fragPos - lightPos;
+    float currentDepth = length(fragToLight);
+
+    float shadow = 0.0, closestDepth = 0.0;
+    float viewDistance = length(viewPos - fragPos);
+    for(int i = 0; i < plSamples; i++) {
+        closestDepth = texture(plShadowMap, fragToLight + gridSamplingDisk[i] * plSampleRadius).r;
+        closestDepth *= plsFarPlane;
+        if(currentDepth - plShadowBias > closestDepth)
+            shadow += 1.0;
+    }
+    shadow /= float(plSamples);
+
+    // Display closestDepth as debug (visualize depth cubemap)
+    // return closestDepth / plsFarPlane;
+    return shadow;
 }
 
 
@@ -138,20 +181,29 @@ void main() {
         // Blinn-Phong
         LightingComponents blinnPhong = blinnPhong(N, L, V, ambient, diffuse, specular, 225);
 
-        // Directional Shadow Mapping
-        vec4 fragPosLightSpace = MDSM * vec4(fragPos, 1.0);
-        float shadow = 0.0f;
-        if (enableDSM) shadow = directionalShadowMapping(N, L, fragPosLightSpace);
-
         // Point, Area, Volume Lights
         vec3 brightness = vec3(0.0);
         if (enablePL) {
-            brightness += pointLightBrightness(pointLight, fragPos);
+            result += pointLightBrightness(pointLight, N, normalize(pointLight.position - fragPos), fragPos, ambient, diffuse, specular, 225);
+        }
+
+        // Shadow Mappings
+        vec4 fragPosLightSpace = MDSM * vec4(fragPos, 1.0);
+        float shadow = 0.0f;
+        float directionalShadow = directionalShadowMapping(N, L, fragPosLightSpace);
+        float pointLightShadow = pointLightShadowMapping(fragPos);
+        if (enableDSM && (enablePL && enablePLS)) {
+            shadow = max(directionalShadow, pointLightShadow);
+            // shadow = directionalShadow * pointLightShadow;
+        } else if (enableDSM) {
+            shadow = directionalShadow;
+        } else if (enablePL && enablePLS) {
+            shadow = pointLightShadow;
         }
 
         // Output
         float diffuseFactor = (1.0f - shadow);
-        result = enableBP
+        result += enableBP
             ? brightness + (blinnPhong.ambient + blinnPhong.diffuse * diffuseFactor + blinnPhong.specular)
             : brightness + diffuse * diffuseFactor;
     
@@ -165,6 +217,9 @@ void main() {
             else
                 result *= 0.75;
         }
+
+        // TEST
+        // result = vec3(pointLightShadow);
     }
 
     // Final color

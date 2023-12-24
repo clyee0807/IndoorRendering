@@ -108,9 +108,15 @@ void ShaderProgram::setInt(const std::string& name, int value) const {
 	glUniform1i(getUniformLocation(name), value);
 }
 
-void ShaderProgram::setTexture(const std::string& name, GLuint textureID, GLuint textureUnit) const {
+void ShaderProgram::setTexture2D(const std::string& name, GLuint textureID, GLuint textureUnit) const {
 	glActiveTexture(GL_TEXTURE0 + textureUnit);
 	glBindTexture(GL_TEXTURE_2D, textureID);
+	setInt(name, textureUnit);
+}
+
+void ShaderProgram::setTextureCube(const std::string& name, GLuint textureID, GLuint textureUnit) const {
+	glActiveTexture(GL_TEXTURE0 + textureUnit);
+	glBindTexture(GL_TEXTURE_CUBE_MAP, textureID);
 	setInt(name, textureUnit);
 }
 

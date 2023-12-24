@@ -118,6 +118,12 @@ class FBO {
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         }
 
+        void bindWrite() const {
+            glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fbo);
+            glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        }
+
         static void unbind() {
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
         }

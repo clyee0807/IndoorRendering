@@ -41,7 +41,8 @@ class ShaderProgram {
 		void setFloat(const std::string& name, float value) const;
 		void setInt(const std::string& name, int value) const;
 
-		void setTexture(const std::string& uniformName, GLuint textureID, GLuint textureUnit) const;
+		void setTexture2D(const std::string& name, GLuint textureID, GLuint textureUnit) const;
+		void setTextureCube(const std::string& name, GLuint textureID, GLuint textureUnit) const;
 };
 
 class Shader : public ShaderProgram {

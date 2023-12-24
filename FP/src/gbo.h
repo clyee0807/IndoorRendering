@@ -110,7 +110,8 @@ class GBO {
 
         void bindWrite() const {
             glBindFramebuffer(GL_FRAMEBUFFER, gbo);
-            glClearColor(0.19f, 0.19f, 0.19f, 1.0f);
+            // glClearColor(0.19f, 0.19f, 0.19f, 1.0f);
+            glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         }
 

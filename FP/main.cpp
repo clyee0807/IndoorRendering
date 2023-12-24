@@ -92,6 +92,9 @@ struct PointLight {
 };
 struct AreaLight {
     vec3 position;
+    vec3 diffuse;
+    float size;
+    float intensity;
 };
 struct VolumeLight {
     vec3 position;
@@ -100,10 +103,9 @@ struct VolumeLight {
 PointLight pointLight = {
     vec3(1.87659, 0.4625, 0.103928), 1.0, 0.7, 0.14
 };
-float pLightScale = 0.22f;
-mat4 MplS = scale(mat4(1.0f), vec3(pLightScale));
-mat4 MplT(1.0f);
-mat4 Mpl(1.0f);
+float lightScale = 0.22f;
+mat4 MplS = scale(mat4(1.0f), vec3(lightScale));
+mat4 MplT(1.0f), Mpl(1.0f);
 bool enablePL = true;
 // Point Light Shadow
 bool enablePLS = true;
@@ -113,7 +115,19 @@ vector<mat4> MPLS;
 float plSampleRadius = 0.05, plShadowBias = 0.15;
 int plSamples = 20;
 // Area Light
+AreaLight areaLight = {
+    vec3(1.0, 0.5, -0.5), vec3(0.8, 0.6, 0.0), 1, 0.4
+};
+mat4 MalS = scale(mat4(1.0f), vec3(1.0f, 1.0f, 0.001f));
+mat4 MalT(1.0f), Mal(1.0f);
+bool enableAL = true;
 // Volume Light
+VolumeLight volumeLight = {
+    vec3(-2.845 * 5, 2.028 * 2.5, -1.293 * 5)
+};
+mat4 MvlS = scale(mat4(1.0f), vec3(lightScale));
+mat4 MvlT(1.0f), Mvl(1.0f);
+bool enableVL = true;
 
 // Shaders
 GLuint rectVAO, rectVBO, currentTexture;
@@ -340,9 +354,17 @@ static void updateMVP() {
     Mv = camera.viewMatrix();
     Mvp = Mp * Mv;
 
-    // Point Light (sphere)
+    // Point Light
     MplT = translate(mat4(1.0f), pointLight.position);
     Mpl = MplT * MplS;
+
+    // Area Light
+    MalT = translate(mat4(1.0f), areaLight.position);
+    Mal = MalT * MalS;
+
+    // Volume Light
+    MvlT = translate(mat4(1.0f), volumeLight.position);
+    Mvl = MvlT * MvlS;
 
     // Lighting
     // Directional Shadow Mapping
@@ -387,12 +409,16 @@ static void renderModel(const Model& model, Shader& shader, const mat4& mMat, co
     model.render(shader);
 }
 
-static void renderScene(const Model& MODEL_ROOM, const Model& MODEL_TRICE, Shader& shader, GLuint shadowMap) {
+static void renderScene(const Model& MODEL_ROOM, const Model& MODEL_TRICE,
+                        const Model& MODEL_SPHERE, const Model& MODEL_CUBE, 
+                        Shader& shader, GLuint shadowMap) {
     shader.activate();
     shader.setTexture2D("shadowMap", shadowMap, 6);  // For modelSP
 
     renderModel(MODEL_ROOM, shader, mat4(1.0f), Mv, Mp);
     renderModel(MODEL_TRICE, shader, Mtrice, Mv, Mp);
+    renderModel(MODEL_CUBE, shader, Mal, Mv, Mp);
+    renderModel(MODEL_SPHERE, shader, Mvl, Mv, Mp);
 }
 
 static void renderLight(const Model& MODEL_LIGHT, Shader& shader, LightType type) {
@@ -465,6 +491,11 @@ static GLuint lightPass(GBO& sourceGBO, FBO& targetFBO, Shader& shader, GLuint d
     shader.setFloat("plShadowBias", plShadowBias);
     shader.setInt("plSamples", plSamples);
 
+    shader.setVec3("areaLight.position", areaLight.position);
+    shader.setVec3("areaLight.diffuse", areaLight.diffuse);
+    shader.setFloat("areaLight.size", areaLight.size);
+    shader.setFloat("areaLight.intensity", areaLight.intensity);
+
     // Options
     shader.setInt("displayType", displayType);
     shader.setInt("enableBP", enableBP);
@@ -472,6 +503,8 @@ static GLuint lightPass(GBO& sourceGBO, FBO& targetFBO, Shader& shader, GLuint d
     shader.setInt("enableNPR", enableNPR);
     shader.setInt("enablePL", enablePL);
     shader.setInt("enablePLS", enablePLS);
+    shader.setInt("enableAL", enableAL);
+    shader.setInt("enableVL", enableVL);
 
     renderFullScreenQuad();
     targetFBO.unbind();
@@ -735,19 +768,35 @@ static void renderLightShadeMenu() {
             ImGui::TreePop();
         }
 
-        // Lighting - Point Light
+        // Lighting - Light Types
         ImGui::SetNextItemOpen(true, ImGuiCond_Once);
         if (ImGui::TreeNode("Point/Area/Volume Lights")) {
-            ImGui::Checkbox("Point Light", &enablePL);
+            // Light Types - Point
+            ImGui::SeparatorText("Point Light");
+            ImGui::Checkbox("Enable PL", &enablePL);
             if (!enablePL) enablePLS = false;
             if (enablePL) {
-                ImGui::DragFloat3("Position", (float*)&pointLight.position, 0.01f, -3.0f, 3.0f, "%.2f");
+                ImGui::DragFloat3("PL Position", (float*)&pointLight.position, 0.01f, -3.0f, 3.0f, "%.2f");
                 ImGui::Checkbox("Point Light Shadow", &enablePLS);
                 if (enablePLS) {
                     ImGui::SliderFloat("Sample Radius", &plSampleRadius, 0.01f, 0.1f, "%.2f");
                     ImGui::SliderFloat("Shadow Bias", &plShadowBias, 0.01f, 0.2f, "%.3f");
                     ImGui::SliderInt("Samples", &plSamples, 4, 32, "%d");
                 }
+            }
+
+            // Light Types - Area
+            ImGui::SeparatorText("Area Light");
+            ImGui::Checkbox("Enable AL", &enableAL);
+            if (enableAL) {
+                ImGui::DragFloat3("AL Position", (float*)&areaLight.position, 0.01f, -3.0f, 3.0f, "%.2f");
+            }
+
+            // Light Types - Volume
+            ImGui::SeparatorText("Volume Light");
+            ImGui::Checkbox("Enable VL", &enableVL);
+            if (enableVL) {
+                ImGui::DragFloat3("VL Position", (float*)&volumeLight.position, 0.01f, -20.0f, 20.0f, "%.2f");
             }
 
             ImGui::TreePop();
@@ -1118,6 +1167,7 @@ int main(void) {
     Model room("FP/models/Grey White Room.obj");
     Model trice("FP/models/Trice.obj");
     Model sphere("FP/models/Sphere.obj");
+    Model cube("FP/models/Cube.obj");
 
     // GBO & FBOs
     gbo.init();
@@ -1159,27 +1209,33 @@ int main(void) {
         {
             dsmFBO.bind();
             dsmSP.activate();
+
             dsmSP.setMat4("MshadowMap", MDSM);
             room.render(dsmSP);
+
             dsmSP.setMat4("MshadowMap", MDSM * Mtrice);
             trice.render(dsmSP);
+
             dsmFBO.unbind();
         }
 
-        // PLS
+        // PLS (does not consider light sources)
         {
             plsFBO.bind();
             plsSP.activate();
+
             plsSP.setMat4("MM", mat4(1.0f));
             plsSP.setMat4Array("MPLS", MPLS);
             plsSP.setVec3("lightPos", pointLight.position);
             plsSP.setFloat("farPlane", PLS_FAR);
             room.render(plsSP);
+
             plsSP.setMat4("MM", Mtrice);
             plsSP.setMat4Array("MPLS", MPLS);
             plsSP.setVec3("lightPos", pointLight.position);
             plsSP.setFloat("farPlane", PLS_FAR);
             trice.render(plsSP);
+
             plsFBO.unbind();
         }
 
@@ -1209,7 +1265,7 @@ int main(void) {
 
         // Geometry Pass
         gbo.bindWrite();
-        renderScene(room, trice, geometrySP, dsmFBO.getTexture());
+        renderScene(room, trice, sphere, cube, geometrySP, dsmFBO.getTexture());
         gbo.unbind();
         
         // Lighting Pass

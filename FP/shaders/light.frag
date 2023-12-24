@@ -28,8 +28,8 @@ uniform bool enableNPR;
 
 uniform bool enablePL;
 uniform bool enablePLS;
-uniform bool enableAreaLight;
-uniform bool enableVolumeLight;
+uniform bool enableAL;
+uniform bool enableVL;
 
 
 
@@ -58,6 +58,9 @@ struct PointLight {
 };
 struct AreaLight {
     vec3 position;
+    vec3 diffuse;
+    float size;
+    float intensity;
 };
 struct VolumeLight {
     vec3 position;
@@ -110,16 +113,19 @@ float directionalShadowMapping(vec3 N, vec3 L, vec4 posLightSpace) {
     return shadow;
 }
 
-vec3 pointLightBrightness(PointLight light, vec3 N, vec3 L, vec3 pos, vec3 Ka, vec3 Kd, vec3 Ks, float Ns) {
+vec3 pointLightEffect(PointLight light, vec3 N, vec3 lightVec, vec3 pos, vec3 Ka, vec3 Kd, vec3 Ks, float Ns) {
+    // Light vector & distance
+    float distance = length(lightVec);
+    vec3 L = normalize(lightVec);
+
     // Diffuse shading
     float diff = max(dot(N, L), 0.0);
     
     // Specular shading
     vec3 reflectDir = reflect(-L, N);
-    float spec = pow(max(dot(normalize(viewPos - light.position), reflectDir), 0.0), Ns);
+    float spec = pow(max(dot(normalize(viewPos - pos), reflectDir), 0.0), Ns);
 
     // Attenuation
-    float distance = length(light.position - pos);
     float attenuation = 1.0 / (light.constant + light.linear * distance + 
     		            light.quadratic * (distance * distance));
     // Result
@@ -157,6 +163,48 @@ float pointLightShadowMapping(vec3 fragPos) {
     return shadow;
 }
 
+vec3 areaLightEffect(AreaLight light, vec3 N, vec3 lightVec, vec3 pos, float Ns) {
+    vec3 lightContribution = vec3(0.0);
+    int numSamples = 8;
+
+    for (int x = 0; x < numSamples; x++) {
+        for (int z = 0; z < numSamples; z++) {
+            float offsetX = (float(x) / (numSamples - 1)) * light.size - light.size / 2.0;
+            float offsetZ = (float(z) / (numSamples - 1)) * light.size - light.size / 2.0;
+            vec3 lightPos = light.position + vec3(offsetX, 0.0, offsetZ);
+
+            // Light vector & distance
+            float distance = length(lightVec);
+            vec3 L = normalize(lightVec);
+
+            // +Z check
+            float lightFacing = dot(L, vec3(0.0, 0.0, 1.0));
+            if (lightFacing <= 0.0) continue;
+
+            // Diffuse shading
+            float diff = max(dot(N, L), 0.0);
+
+            // Specular shading
+            vec3 reflectDir = reflect(-L, N);
+            float spec = pow(max(dot(normalize(viewPos - pos), reflectDir), 0.0), Ns);
+
+            // Attenuate based on distance
+            float attenuation = light.intensity / (distance * distance);
+
+            // Add contribution (assuming Lambertian reflectance)
+            lightContribution += attenuation * light.diffuse * (diff + spec);
+        }
+    }
+
+    // Result
+    lightContribution /= float(numSamples * numSamples);
+    return lightContribution;
+}
+
+vec3 volumeLightEffect(VolumeLight light) {
+    return vec3(0.0);
+}
+
 
 
 /* ---------------------------- MAIN ---------------------------- */
@@ -184,7 +232,12 @@ void main() {
         // Point, Area, Volume Lights
         vec3 brightness = vec3(0.0);
         if (enablePL) {
-            result += pointLightBrightness(pointLight, N, normalize(pointLight.position - fragPos), fragPos, ambient, diffuse, specular, 225);
+            result += pointLightEffect(pointLight, N, (pointLight.position - fragPos), fragPos, ambient, diffuse, specular, 225);
+        }
+        if (enableAL) {
+            result += areaLightEffect(areaLight, N, (areaLight.position - fragPos), fragPos, 225);
+        }
+        if (enableVL) {
         }
 
         // Shadow Mappings
@@ -193,8 +246,8 @@ void main() {
         float directionalShadow = directionalShadowMapping(N, L, fragPosLightSpace);
         float pointLightShadow = pointLightShadowMapping(fragPos);
         if (enableDSM && (enablePL && enablePLS)) {
-            shadow = max(directionalShadow, pointLightShadow);
-            // shadow = directionalShadow * pointLightShadow;
+            // shadow = max(directionalShadow, pointLightShadow);
+            shadow = directionalShadow * pointLightShadow;
         } else if (enableDSM) {
             shadow = directionalShadow;
         } else if (enablePL && enablePLS) {

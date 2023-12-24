@@ -246,8 +246,8 @@ void main() {
         float directionalShadow = directionalShadowMapping(N, L, fragPosLightSpace);
         float pointLightShadow = pointLightShadowMapping(fragPos);
         if (enableDSM && (enablePL && enablePLS)) {
-            // shadow = max(directionalShadow, pointLightShadow);
-            shadow = directionalShadow * pointLightShadow;
+            shadow = max(directionalShadow, pointLightShadow);
+            // shadow = directionalShadow * pointLightShadow;
         } else if (enableDSM) {
             shadow = directionalShadow;
         } else if (enablePL && enablePLS) {

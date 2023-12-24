@@ -103,8 +103,8 @@ struct VolumeLight {
 PointLight pointLight = {
     vec3(1.87659, 0.4625, 0.103928), 1.0, 0.7, 0.14
 };
-float lightScale = 0.22f;
-mat4 MplS = scale(mat4(1.0f), vec3(lightScale));
+float pLightScale = 0.22f;
+mat4 MplS = scale(mat4(1.0f), vec3(pLightScale));
 mat4 MplT(1.0f), Mpl(1.0f);
 bool enablePL = true;
 // Point Light Shadow
@@ -125,7 +125,8 @@ bool enableAL = true;
 VolumeLight volumeLight = {
     vec3(-2.845 * 5, 2.028 * 2.5, -1.293 * 5)
 };
-mat4 MvlS = scale(mat4(1.0f), vec3(lightScale));
+float vLightScale = 1.5f;
+mat4 MvlS = scale(mat4(1.0f), vec3(vLightScale));
 mat4 MvlT(1.0f), Mvl(1.0f);
 bool enableVL = true;
 
@@ -512,43 +513,39 @@ static GLuint lightPass(GBO& sourceGBO, FBO& targetFBO, Shader& shader, GLuint d
     return targetFBO.getTexture();
 }
 
-static GLuint bloomFilter(Shader& brightPassShader, Shader& gaussianShader, Shader& bloomShader) {
+static GLuint bloomFilter(Shader& brightPassShader, Shader& gaussianShader, Shader& bloomShader, GLuint sourceTex) {
     // Bright pass + Gaussian blur
-    //brightPassFBO.bind();
-    //brightPassShader.activate();
-    //glUniform1i(glGetUniformLocation(brightPassShader.getID(), "screenTex"), 0);
-    //glUniform1f(glGetUniformLocation(brightPassShader.getID(), "brightnessThreshold"), brightnessThreshold);
-    //renderFullScreenQuad(currentTexture);
-    //brightPassFBO.unbind();
+    brightPassFBO.bind();
+    brightPassShader.activate();
+    brightPassShader.setInt("screenTex", 0);
+    brightPassShader.setFloat("brightnessThreshold", brightnessThreshold);
+    renderFullScreenQuad(sourceTex);
+    brightPassFBO.unbind();
 
 
-    //gaussianShader.activate();
-    //glUniform1i(glGetUniformLocation(gaussianShader.getID(), "brightTex"), 0);
+    gaussianShader.activate();
+    gaussianShader.setInt("brightTex", 0);
 
-    //gaussianHFBO.bind();
-    //glUniform1i(glGetUniformLocation(gaussianShader.getID(), "isHorizontal"), GL_TRUE);
-    //glUniform1f(glGetUniformLocation(gaussianShader.getID(), "sigma"), strength);
-    //renderFullScreenQuad(brightPassFBO.getTexture());
-    //gaussianHFBO.unbind();
+    gaussianHFBO.bind();
+    gaussianShader.setInt("isHorizontal", GL_TRUE);
+    brightPassShader.setFloat("sigma", strength);
+    renderFullScreenQuad(brightPassFBO.getTexture());
+    gaussianHFBO.unbind();
 
-    //gaussianVFBO.bind();
-    //glUniform1i(glGetUniformLocation(gaussianShader.getID() "isHorizontal"), GL_FALSE);
-    //renderFullScreenQuad(gaussianHFBO.getTexture());
-    //gaussianVFBO.unbind();
+    gaussianVFBO.bind();
+    gaussianShader.setInt("isHorizontal", GL_FALSE);
+    renderFullScreenQuad(gaussianHFBO.getTexture());
+    gaussianVFBO.unbind();
 
-    //// Bloom
-    //bloomFBO.bind();
-    //bloomShader.activate();
-    //glUniform1i(glGetUniformLocation(bloomShader.getID(), "originalSceneTex"), 0);
-    //glActiveTexture(GL_TEXTURE0);
-    //glBindTexture(GL_TEXTURE_2D, currentTexture);
-    //glUniform1i(glGetUniformLocation(bloomShader.getID(), "blurredBrightTex"), 1);
-    //glActiveTexture(GL_TEXTURE1);
-    //glBindTexture(GL_TEXTURE_2D, gaussianVFBO.getTexture());
-    //renderFullScreenQuad();
-    //bloomFBO.unbind();
+    // Bloom
+    bloomFBO.bind();
+    bloomShader.activate();
+    bloomShader.setTexture2D("originalSceneTex", sourceTex, 0);
+    bloomShader.setTexture2D("blurredBrightTex", gaussianVFBO.getTexture(), 1);
+    renderFullScreenQuad();
+    bloomFBO.unbind();
 
-    //currentTexture = bloomFBO.getTexture();
+    return bloomFBO.getTexture();
 }
 
 static GLuint npr(FBO& edgeFBO, Shader& nprShader, GLuint sourceTex) {

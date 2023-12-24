@@ -19,12 +19,14 @@ uniform sampler2D gNormal;
 uniform sampler2D gDiffuse;
 uniform sampler2D gAmbient;
 uniform sampler2D gSpecular;
+uniform sampler2D gDepth;
 
 // Options
 uniform int displayType;
 uniform bool enableBP;
 uniform bool enableDSM;
 uniform bool enableNPR;
+uniform bool enableSSAO;
 
 uniform bool enablePL;
 uniform bool enablePLS;
@@ -76,7 +78,12 @@ uniform float plSampleRadius;
 uniform float plShadowBias;
 uniform int plSamples;
 
-
+// SSAO
+uniform vec3 ssaoKernel[64];
+uniform float ssaoRadius = 0.5;
+uniform float ssaoBias = 0.025;
+uniform float near = 0.01;
+uniform float far = 150.0f;
 
 /* -------------------------- LIGHTING -------------------------- */
 LightingComponents blinnPhong(vec3 N, vec3 L, vec3 V, vec3 Ka, vec3 Kd, vec3 Ks, float Ns) {
@@ -205,6 +212,31 @@ vec3 volumeLightEffect(VolumeLight light) {
     return vec3(0.0);
 }
 
+// SSAO
+float linearizeDepth(float depth) {
+    float z = depth * 2.0 - 1.0; 
+    return (2.0 * near * far) / (far + near - z * (far - near));
+}
+
+float computeSSAO(vec3 fragPos, vec3 normal, vec2 texCoord) {
+    float occlusion = 0.0;
+    for (int i = 0; i < 64; ++i) {
+        vec3 samplePos = fragPos + ssaoKernel[i] * ssaoRadius;
+        vec4 offset = vec4(samplePos, 1.0);
+        offset = MP * offset; 
+        offset.xyz /= offset.w;
+        offset.xyz = offset.xyz * 0.5 + 0.5;
+
+        float sampleDepth = texture(gDepth, offset.xy).z;
+        sampleDepth = linearizeDepth(sampleDepth);
+        float depthDiff = fragPos.z - sampleDepth;
+
+        if (depthDiff < ssaoBias) {
+            occlusion += 1.0;
+        }
+    }
+    return 1.0 - (occlusion / 64.0);
+}
 
 
 /* ---------------------------- MAIN ---------------------------- */
@@ -215,6 +247,7 @@ void main() {
     vec3 diffuse = texture(gDiffuse, texCoords).rgb;
     vec3 ambient = texture(gAmbient, texCoords).rgb;
     vec3 specular = texture(gSpecular, texCoords).rgb;
+    vec3 depth = texture(gDepth, texCoords).rgb;  // cannot use gDepth, i tried.
 
     vec3 result = vec3(0.0);
 
@@ -225,6 +258,12 @@ void main() {
         vec3 N = normalize(mat3(MV) * normal);
         vec3 L = normalize(lightPosView.xyz - P.xyz);
         vec3 V = normalize(-P.xyz);
+
+        // SSAO
+        float ssaoOcclusion = 1.0;
+        if (enableSSAO) {
+            ssaoOcclusion = computeSSAO(fragPos, normal, texCoords);
+        }
 
         // Blinn-Phong
         LightingComponents blinnPhong = blinnPhong(N, L, V, ambient, diffuse, specular, 225);
@@ -273,6 +312,9 @@ void main() {
 
         // TEST
         // result = vec3(pointLightShadow);
+        
+        // SSAO
+        result *= ssaoOcclusion;
     }
 
     // Final color

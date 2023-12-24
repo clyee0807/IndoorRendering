@@ -3,6 +3,7 @@
 #include <cmath>
 #include <iomanip>
 #include <ctime>
+#include <random>
 
 // #define VSYNC_DISABLED
 #define DEFERRED_SHADING
@@ -159,13 +160,22 @@ FBO fxaaFBO(windowWidth, windowHeight, FBOType::FBOType_2D);
 bool enableFXAA = true;
 const char* FXAA_LEVELS[] = { "3", "4", "5" };
 const char* fxaaLevel = FXAA_LEVELS[2];
+// SSAO
+bool enableSSAO = false;
+std::vector<glm::vec3> ssaoKernel;
 
 // Screenshot
 const char* SS_FORMATS[] = { "JPEG", "PNG" };
 const char* ssFormat = SS_FORMATS[0];
 bool ignoreAlpha = false;
 
+float randomFloat() {
+    static std::random_device rd;
+    static std::mt19937 gen(rd());
+    static std::uniform_real_distribution<float> dis(0.0, 1.0);
 
+    return dis(gen);
+}
 
 /* -------------------------- CALLBACK -------------------------- */
 static void errorCallback(int error, const char* description) {
@@ -465,6 +475,7 @@ static GLuint lightPass(GBO& sourceGBO, FBO& targetFBO, Shader& shader, GLuint d
     shader.setTexture2D("gDiffuse", sourceGBO.getTexture(GBO_TEXTURE_TYPE_DIFFUSE), 2);
     shader.setTexture2D("gAmbient", sourceGBO.getTexture(GBO_TEXTURE_TYPE_AMBIENT), 3);
     shader.setTexture2D("gSpecular", sourceGBO.getTexture(GBO_TEXTURE_TYPE_SPECULAR), 4);
+    shader.setTexture2D("gDepth", sourceGBO.getTexture(GBO_TEXTURE_TYPE_DEPTH), 5);
     shader.setTexture2D("shadowMap", dShadowMap, 6);
     shader.setTextureCube("plShadowMap", plShadowMap, 7);
 
@@ -506,6 +517,7 @@ static GLuint lightPass(GBO& sourceGBO, FBO& targetFBO, Shader& shader, GLuint d
     shader.setInt("enablePLS", enablePLS);
     shader.setInt("enableAL", enableAL);
     shader.setInt("enableVL", enableVL);
+    shader.setInt("enableSSAO", enableSSAO);
 
     renderFullScreenQuad();
     targetFBO.unbind();
@@ -856,6 +868,8 @@ static void renderLightShadeMenu() {
 
             ImGui::TreePop();
         }
+        ImGui::Checkbox("Enable SSAO", &enableSSAO);
+
     }
 
     ImGui::End();
@@ -1126,7 +1140,25 @@ static void screenshot() {
     captureScreen = false;
 }
 
+std::vector<glm::vec3> initSSAOKernel() {
+    //std::uniform_real_distribution<GLfloat> randomFloat(0.0, 1.0); 
+    //std::default_random_engine generator;
+    std::vector<glm::vec3> ssaoKernel;
+    for (int i = 0; i < 64; ++i) {
+        glm::vec3 sample(
+            randomFloat() * 2.0 - 1.0,
+            randomFloat() * 2.0 - 1.0,
+            randomFloat());
+        sample = glm::normalize(sample);
+        sample *= randomFloat();
+        float scale = float(i) / 64.0;
 
+        scale = lerp(0.1f, 1.0f, scale * scale);
+        sample *= scale;
+        ssaoKernel.push_back(sample);
+    }
+    return ssaoKernel;
+}
 
 /* ---------------------------- MAIN ---------------------------- */
 int main(void) {
@@ -1179,6 +1211,9 @@ int main(void) {
     // FXAA
     fxaaFBO.init();
     
+    // SSAO's kernel
+    ssaoKernel = initSSAOKernel();
+
 
 
 #ifdef VSYNC_DISABLED
